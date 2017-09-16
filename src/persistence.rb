@@ -11,4 +11,10 @@ end
 class ActiveRecord
   extend Persistence
 
+  def save!
+    table = TADB::DB.table(self.class.name)
+    hash = {}
+    self.class.persistable_fields.each { |field| hash[field] = self.instance_eval("#{field}") }
+    table.insert(hash)
+  end
 end
