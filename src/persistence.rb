@@ -8,7 +8,7 @@ module Persistence
   end
 end
 
-class ActiveRecord
+class Class
   extend Persistence
 
 end
