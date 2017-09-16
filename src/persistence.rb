@@ -9,6 +9,6 @@ module Persistence
 end
 
 class Class
-  extend Persistence
+  include Persistence
 
 end
