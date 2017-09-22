@@ -15,12 +15,30 @@ module Persistence
       @persistable_fields ||= []
       @persistable_fields << name
     end
+
+    def all_instances
+      instances = []
+      table = TADB::DB.table(self.name)
+      table.entries.each { |instance| instances << (self.createNewInstance instance) }
+      instances
+    end
+
+    def createNewInstance attributes
+      instance = self.new
+      @persistable_fields.each.each { |field| instance.send("#{field}=", attributes[field]) }
+      instance.create_id attributes[:id]
+      instance
+    end
   end
 
   module InstancePersistence
     attr_accessor :table
-    def save!
+
+    def initialize
       @table = TADB::DB.table(self.class.name)
+    end
+
+    def save!
       hash = {}
       self.class.persistable_fields.each { |field| hash[field] = self.instance_eval("#{field}") }
       id = table.insert(hash)
@@ -32,16 +50,19 @@ module Persistence
         instance = @table.entries.find{ |i| i[:id] == @id }
         self.class.persistable_fields.each { |field| self.send("#{field}=", instance[field])      }
       else
-        raise Exception.new("Este objeto no tiene id!")
+        raise("Este objeto no tiene id!")
       end
     end
 
-    private
+    def forget!
+      @table.delete(@id)
+      remove_instance_variable(:@id)
+    end
 
     def create_id id
       self.instance_variable_set(:@id, id)
       self.define_singleton_method(:id) do
-        id
+        @id
       end
     end
   end

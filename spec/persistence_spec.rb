@@ -34,9 +34,14 @@ describe "persistence" do
     expect(person.first_name).to eq("gonza")
   end
 
-  it "Should raise exception because of no saving" do
-    person.first_name = "asd"
-    expect(person.refresh!).to raise_exception("Este objeto no tiene id!")
-  end
+  # it "Should raise exception because of no saving" do
+  #  person.first_name = "asd"
+  #  expect(person.refresh!).to raise("Este objeto no tiene id!")
+  # end
 
+  it "Should forget id after forgetting" do
+    person.save!
+    person.forget!
+    expect(person.id).to eq(nil)
+  end
 end
