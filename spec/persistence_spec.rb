@@ -5,7 +5,12 @@ describe "persistence" do
   fixture = Fixture.new
   let!(:person) {fixture.person}
 
-  describe "creating a persistable person" do
+    after(:each) do
+      if File.exist? "./db/Person"
+       File.delete("./db/Person")
+      end
+    end
+
     it "Should have persistable attributes" do
       expect(person).to respond_to(:first_name)
       expect(person).to respond_to(:last_name)
@@ -15,7 +20,6 @@ describe "persistence" do
     it "Should not have other attributes" do
       expect(person).not_to respond_to(:saraza)
     end
-  end
 
   it "Should have persistable attributes" do
     expect(person.first_name).to eq("gonza")
@@ -44,4 +48,19 @@ describe "persistence" do
     person.forget!
     expect(person.id).to eq(nil)
   end
+
+  it "Should bring 2 instances with all instances" do
+    person.save!
+    anotherPerson = fixture.person
+    anotherPerson.save!
+    expect(Person.all_instances.size).to eq(2)
+  end
+
+  it "Should understand variables with all instances" do
+    person.save!
+    anotherPerson = fixture.person
+    anotherPerson.save!
+    expect(Person.all_instances.first).to respond_to(:first_name)
+  end
+
 end
