@@ -53,6 +53,8 @@ describe "persistence" do
     person.save!
     anotherPerson = fixture.person
     anotherPerson.save!
+    personThatWontSave = fixture.person
+    personThatWontSave.first_name = "nono"
     expect(Person.all_instances.size).to eq(2)
   end
 

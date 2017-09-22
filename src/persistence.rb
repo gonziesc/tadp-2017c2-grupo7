@@ -1,4 +1,5 @@
 require 'tadb'
+require_relative './boolean.rb'
 
 module Persistence
 
@@ -29,6 +30,15 @@ module Persistence
       instance.create_id attributes[:id]
       instance
     end
+
+    def method_missing(sym, *args, &block)
+      method = sym.to_s
+      if(method.start_with?("find_by"))
+        puts method.chomp("find_by")
+      end
+      super(sym, *args, &block)
+    end
+
   end
 
   module InstancePersistence
