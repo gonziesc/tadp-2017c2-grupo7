@@ -7,9 +7,9 @@ class Fixture
     person.last_name = "esc"
     person.age = 20
     person.animal = animal
-    aBook = book
-    anotherBook = book
-    person.books = [aBook, anotherBook]
+    #aBook = book
+    #anotherBook = book
+    #person.books = [aBook, anotherBook]
     person
   end
 
@@ -46,7 +46,7 @@ class Person
   has_one String, named: :last_name
   has_one Numeric, named: :age
   has_one Animal, named: :animal
-  has_many Book, named: :books
+  #has_many Book, named: :books
 end
 
 

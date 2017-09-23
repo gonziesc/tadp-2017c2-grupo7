@@ -9,19 +9,21 @@ module Persistence
   end
 
   module ClassPersistence
-    attr_accessor :persistable_fields
+    attr_accessor :persistable_fields, :many_persistable_fields
     def has_one type, hash
-      name = hash[:named]
-      attr_accessor(name)
-      # TODO change type if redefines the same name
-      persistable_field = {name: name, type: type}
       @persistable_fields ||= []
-      @persistable_fields << persistable_field
+      @persistable_fields << (define_persistable_field hash[:named], type)
     end
 
     def has_many type, hash
-      has_one type, hash
-      ## ver el has many, crear tabla aca?
+      @many_persistable_fields ||= []
+      @many_persistable_fields << (define_persistable_field hash[:named], type)
+    end
+
+    def define_persistable_field name, type
+      attr_accessor(name)
+      persistable_field = {name: name, type: type}
+      persistable_field
     end
 
     def all_instances
@@ -33,8 +35,8 @@ module Persistence
 
     def createNewInstance attributes
       instance = self.new
-      @persistable_fields.each.each { |field| instance.send("#{field[:name]}=", attributes[field[:name]]) }
-      instance.send('id=', attributes[:id])
+      @persistable_fields.each.each { |field| instance.instance_variable_set("@#{field[:name]}", attributes[field[:name]]) }
+      instance.instance_variable_set("@id", attributes[:id])
       instance
     end
 
@@ -108,11 +110,11 @@ module Persistence
 
     def refresh_field field, instance
       value = instance[field[:name]]
-      actualValue =  self.instance_eval("#{field[:name]}")
+      actualValue =  self.instance_variable_get("@#{field[:name]}")
       if not is_a_primitive_type? actualValue
         actualValue.refresh!
       else
-        self.send("#{field[:name]}=", value)
+        self.instance_variable_set("@#{field[:name]}", value)
       end
     end
 
