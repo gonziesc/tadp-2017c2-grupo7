@@ -151,6 +151,12 @@ describe "persistence" do
       person.refresh!
       expect(person.books.last.name).to eq("gonza")
     end
+
+    it "Should all instances bring the complete person" do
+      person.save!
+      expect(Person.all_instances.first.books.first.name).to eq("harry")
+    end
+
   end
 
 end
