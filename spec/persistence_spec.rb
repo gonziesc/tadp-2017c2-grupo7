@@ -65,4 +65,31 @@ describe "persistence" do
     expect(Person.all_instances.first).to respond_to(:first_name)
   end
 
+  it "Should filter by first name bringing 3 instances" do
+    person.save!
+    anotherPerson = fixture.person
+    anotherPerson.save!
+    otherPerson = fixture.person
+    otherPerson.save!
+    expect(Person.find_by_first_name("gonza").size).to eq(3)
+  end
+
+  it "Should filter by first name bringing 0 instances" do
+    person.save!
+    anotherPerson = fixture.person
+    anotherPerson.save!
+    otherPerson = fixture.person
+    otherPerson.save!
+    expect(Person.find_by_first_name("asd").size).to eq(0)
+  end
+
+  it "Should filter by id bringing 1 instances" do
+    person.save!
+    anotherPerson = fixture.person
+    anotherPerson.save!
+    otherPerson = fixture.person
+    otherPerson.save!
+    expect(Person.find_by_id(person.id).size).to eq(1)
+  end
+
 end

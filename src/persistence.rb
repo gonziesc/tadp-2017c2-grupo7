@@ -27,32 +27,37 @@ module Persistence
     def createNewInstance attributes
       instance = self.new
       @persistable_fields.each.each { |field| instance.send("#{field}=", attributes[field]) }
-      instance.create_id attributes[:id]
+      instance.send('id=', attributes[:id])
       instance
     end
 
     def method_missing(sym, *args, &block)
       method = sym.to_s
-      if(method.start_with?("find_by"))
-        puts method.chomp("find_by")
+      if method.start_with? 'find_by'
+        instance_method = method[8..-1]
+        if self.method_defined? instance_method and self.instance_method(instance_method).arity == 0
+          self.all_instances.select {|instance| instance.send(instance_method) == args[0]}
+        end
+      else
+        super(sym, *args, &block)
       end
-      super(sym, *args, &block)
     end
 
   end
 
   module InstancePersistence
-    attr_accessor :table
+    attr_accessor :table, :id
 
     def initialize
       @table = TADB::DB.table(self.class.name)
+      @id = nil
     end
 
     def save!
       hash = {}
       self.class.persistable_fields.each { |field| hash[field] = self.instance_eval("#{field}") }
       id = table.insert(hash)
-      create_id id
+      @id = id
     end
 
     def refresh!
@@ -69,11 +74,5 @@ module Persistence
       remove_instance_variable(:@id)
     end
 
-    def create_id id
-      self.instance_variable_set(:@id, id)
-      self.define_singleton_method(:id) do
-        @id
-      end
-    end
   end
 end
