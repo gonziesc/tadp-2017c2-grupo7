@@ -19,6 +19,11 @@ module Persistence
       @persistable_fields << persistable_field
     end
 
+    def has_many type, hash
+      has_one type, hash
+      ## ver el has many, crear tabla aca?
+    end
+
     def all_instances
       instances = []
       table = TADB::DB.table(self.name)
@@ -75,9 +80,17 @@ module Persistence
       if is_a_primitive_type? value
         { field[:name] => value }
       else
-        value.save!
-        { field[:name] => value.id }
+        save_object_field field, value
       end
+    end
+
+    def save_object_field field, value
+      if value.is_a? Array
+        ## TODO terminar has_many
+        value.each {|oneValue| oneValue.save!}
+      end
+      value.save!
+      { field[:name] => value.id }
     end
 
     def is_a_primitive_type? value

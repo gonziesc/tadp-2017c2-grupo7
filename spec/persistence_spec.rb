@@ -12,6 +12,9 @@ describe "persistence" do
       if File.exist? "./db/Animal"
         File.delete("./db/Animal")
       end
+      if File.exist? "./db/Book"
+        File.delete("./db/Book")
+      end
     end
 
     it "Should have persistable attributes" do
@@ -118,6 +121,17 @@ describe "persistence" do
       animal.save!
       person.refresh!
       expect(person.animal.age).to eq(2)
+    end
+  end
+
+  describe "has many" do
+    it "Should have 3 books after adding one" do
+      book = fixture.book
+      person.books.push(book)
+      person.books.last.name = "gonza"
+      person.save!
+      expect(person.books.last.name).to eq("gonza")
+      expect(person.books.size).to eq(3)
     end
   end
 

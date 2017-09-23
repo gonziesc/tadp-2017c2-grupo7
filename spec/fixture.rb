@@ -7,6 +7,9 @@ class Fixture
     person.last_name = "esc"
     person.age = 20
     person.animal = animal
+    aBook = book
+    anotherBook = book
+    person.books = [aBook, anotherBook]
     person
   end
 
@@ -17,6 +20,12 @@ class Fixture
     animal.age = 1
     animal
   end
+
+  def book
+    book = Book.new
+    book.name = "harry"
+    book
+  end
 end
 
 class Animal
@@ -26,11 +35,19 @@ class Animal
   has_one Numeric, named: :age
 end
 
+class Book
+  include Persistence
+  has_one String, named: :name
+end
+
 class Person
   include Persistence
   has_one String, named: :first_name
   has_one String, named: :last_name
   has_one Numeric, named: :age
   has_one Animal, named: :animal
+  has_many Book, named: :books
 end
+
+
 
