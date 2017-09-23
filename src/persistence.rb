@@ -13,8 +13,9 @@ module Persistence
     def has_one type, hash
       name = hash[:named]
       attr_accessor(name)
+      persistable_field = {name: name, type: type}
       @persistable_fields ||= []
-      @persistable_fields << name
+      @persistable_fields << persistable_field
     end
 
     def all_instances
@@ -26,7 +27,7 @@ module Persistence
 
     def createNewInstance attributes
       instance = self.new
-      @persistable_fields.each.each { |field| instance.send("#{field}=", attributes[field]) }
+      @persistable_fields.each.each { |field| instance.send("#{field[:name]}=", attributes[field[:name]]) }
       instance.send('id=', attributes[:id])
       instance
     end
@@ -63,7 +64,7 @@ module Persistence
 
     def save!
       hash = {}
-      self.class.persistable_fields.each { |field| hash[field] = self.instance_eval("#{field}") }
+      self.class.persistable_fields.each { |field| hash[field[:name]] = self.instance_eval("#{field[:name]}") }
       id = table.insert(hash)
       @id = id
     end
@@ -71,7 +72,7 @@ module Persistence
     def refresh!
       if @id
         instance = @table.entries.find{ |i| i[:id] == @id }
-        self.class.persistable_fields.each { |field| self.send("#{field}=", instance[field])      }
+        self.class.persistable_fields.each { |field| self.send("#{field[:name]}=", instance[field[:name]])      }
       else
         raise("Este objeto no tiene id!")
       end
