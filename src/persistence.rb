@@ -13,6 +13,7 @@ module Persistence
     def has_one type, hash
       name = hash[:named]
       attr_accessor(name)
+      # TODO change type if redefines the same name
       persistable_field = {name: name, type: type}
       @persistable_fields ||= []
       @persistable_fields << persistable_field
@@ -64,17 +65,41 @@ module Persistence
 
     def save!
       hash = {}
-      self.class.persistable_fields.each { |field| hash[field[:name]] = self.instance_eval("#{field[:name]}") }
+      self.class.persistable_fields.each { |field| hash.merge!(save_field field) }
       id = table.insert(hash)
       @id = id
+    end
+
+    def save_field field
+      value = self.instance_eval("#{field[:name]}")
+      if is_a_primitive_type? value
+        { field[:name] => value }
+      else
+        value.save!
+        { field[:name] => value.id }
+      end
+    end
+
+    def is_a_primitive_type? value
+      value.is_a? String or value.is_a? Numeric or value.is_a? Boolean
     end
 
     def refresh!
       if @id
         instance = @table.entries.find{ |i| i[:id] == @id }
-        self.class.persistable_fields.each { |field| self.send("#{field[:name]}=", instance[field[:name]])      }
+        self.class.persistable_fields.each { |field| refresh_field field, instance}
       else
         raise("Este objeto no tiene id!")
+      end
+    end
+
+    def refresh_field field, instance
+      value = instance[field[:name]]
+      actualValue =  self.instance_eval("#{field[:name]}")
+      if not is_a_primitive_type? actualValue
+        actualValue.refresh!
+      else
+        self.send("#{field[:name]}=", value)
       end
     end
 
