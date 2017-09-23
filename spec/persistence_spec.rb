@@ -86,6 +86,10 @@ describe "persistence" do
     it "Should filter by id bringing 1 instances" do
       expect(Person.find_by_id(person.id).size).to eq(1)
     end
+
+   # it "Should raise error method missing" do
+   #   expect(Person.find_by_asdasd()).to raise_error("El metodo no existe o tiene parametros")
+   # end
   end
 
 end

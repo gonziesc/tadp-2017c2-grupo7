@@ -35,11 +35,19 @@ module Persistence
       method = sym.to_s
       if method.start_with? 'find_by'
         instance_method = method[8..-1]
-        if self.method_defined? instance_method and self.instance_method(instance_method).arity == 0
-          self.all_instances.select {|instance| instance.send(instance_method) == args[0]}
-        end
+        find_by instance_method, args[0]
       else
         super(sym, *args, &block)
+      end
+    end
+
+    private
+
+    def find_by instance_method, arg
+      if self.method_defined? instance_method and self.instance_method(instance_method).arity == 0
+        self.all_instances.select {|instance| instance.send(instance_method) == arg}
+      else
+        raise("El metodo no existe o tiene parametros")
       end
     end
 
