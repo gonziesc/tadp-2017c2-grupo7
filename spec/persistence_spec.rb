@@ -15,6 +15,9 @@ describe "persistence" do
       if File.exist? "./db/Book"
         File.delete("./db/Book")
       end
+      if File.exist? "./db/Person_books"
+        File.delete("./db/Person_books")
+      end
     end
 
     it "Should have persistable attributes" do
@@ -114,6 +117,11 @@ describe "persistence" do
       expect(person.animal.age).to eq(1)
     end
 
+    it "Should all instances bring the complete person" do
+      person.save!
+      expect(Person.all_instances.first.animal.age).to eq(1)
+    end
+
     it "Should change attribute after refreshing" do
       person.save!
       animal = person.animal
@@ -132,6 +140,16 @@ describe "persistence" do
       person.save!
       expect(person.books.last.name).to eq("gonza")
       expect(person.books.size).to eq(3)
+    end
+    it "Should refresh the last book" do
+      book = fixture.book
+      person.books.push(book)
+      person.save!
+      anotherBook = person.books.last
+      anotherBook.name = "gonza"
+      anotherBook.save!
+      person.refresh!
+      expect(person.books.last.name).to eq("gonza")
     end
   end
 

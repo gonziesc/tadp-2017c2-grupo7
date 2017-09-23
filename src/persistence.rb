@@ -4,20 +4,20 @@ require_relative './boolean.rb'
 module Persistence
 
   def self.included base
-    base.send :extend, ClassPersistence
-    base.send :include, InstancePersistence
+    base.extend ClassPersistence
+    base.include InstancePersistence
   end
 
   module ClassPersistence
-    attr_accessor :persistable_fields, :many_persistable_fields
+    attr_accessor :persistable_fields
+
     def has_one type, hash
       @persistable_fields ||= []
       @persistable_fields << (define_persistable_field hash[:named], type)
     end
 
     def has_many type, hash
-      @many_persistable_fields ||= []
-      @many_persistable_fields << (define_persistable_field hash[:named], type)
+      has_one type, hash
     end
 
     def define_persistable_field name, type
@@ -35,9 +35,22 @@ module Persistence
 
     def createNewInstance attributes
       instance = self.new
-      @persistable_fields.each.each { |field| instance.instance_variable_set("@#{field[:name]}", attributes[field[:name]]) }
+      @persistable_fields.each { |field| initializeByType instance, field[:name], field[:type], attributes[field[:name]] }
       instance.instance_variable_set("@id", attributes[:id])
       instance
+    end
+
+    def initializeByType instance, name, type, value
+      if is_a_primitive_type? type.to_s
+        instance.instance_variable_set("@#{name}", value)
+      else
+        has_one_instance = type.find_by_id(value).first
+        instance.instance_variable_set("@#{name}", has_one_instance)
+      end
+    end
+
+    def is_a_primitive_type? type
+      type == "String" or type == "Boolean" or type == "Numeric"
     end
 
     def method_missing(sym, *args, &block)
@@ -78,21 +91,29 @@ module Persistence
     end
 
     def save_field field
-      value = self.instance_eval("#{field[:name]}")
+      value = self.instance_variable_get("@#{field[:name]}")
       if is_a_primitive_type? value
         { field[:name] => value }
-      else
-        save_object_field field, value
+      else if value.is_a? Array
+            create_hash_for_many field[:name], value
+           else
+             value.save!
+             { field[:name] => value.id }
+           end
       end
     end
 
-    def save_object_field field, value
-      if value.is_a? Array
-        ## TODO terminar has_many
-        value.each {|oneValue| oneValue.save!}
-      end
-      value.save!
-      { field[:name] => value.id }
+    def create_hash_for_many name, list
+      table_name = self.class.name + "_" + name.to_s
+      many_table = TADB::DB.table(table_name)
+      ids = []
+      list.each { |object| ids << (object.save!) }
+      ids.each {|id| many_table.insert(key_for_many id)}
+      {name => table_name}
+    end
+
+    def key_for_many id
+      {"foreign_key" => id}
     end
 
     def is_a_primitive_type? value
@@ -111,10 +132,13 @@ module Persistence
     def refresh_field field, instance
       value = instance[field[:name]]
       actualValue =  self.instance_variable_get("@#{field[:name]}")
-      if not is_a_primitive_type? actualValue
-        actualValue.refresh!
-      else
+      if is_a_primitive_type? actualValue
         self.instance_variable_set("@#{field[:name]}", value)
+      else if actualValue.is_a? Array
+             actualValue.each {|obj| obj.refresh!}
+           else
+             actualValue.refresh!
+           end
       end
     end
 
