@@ -11,10 +11,25 @@ module Persistence
   module ClassPersistence
     attr_accessor :persistible_fields
 
+    def descendants
+      ObjectSpace.each_object(Class).select { |klass| klass < self }
+    end
+
     def has_one (type, hash)
       @persistible_fields ||= []
+      if self.respond_to? "superclass" and self.superclass.instance_variable_get(:@persistible_fields)
+        superclass.instance_variable_get(:@persistible_fields).each {|field| @persistible_fields << field}
+      end
+      self.included_modules.each {|oneModule| define_module_persistible_fields oneModule}
       @persistible_fields << (define_persistible_field hash[:named], type)
     end
+
+      def define_module_persistible_fields (oneModule)
+        if oneModule.respond_to? "persistible_fields"
+          oneModule.persistible_fields.each {|field| @persistible_fields << field}
+        end
+      end
+
 
     def has_many (type, hash)
       has_one type, hash
@@ -29,6 +44,7 @@ module Persistence
       instances = []
       table = TADB::DB.table(self.name)
       table.entries.each { |instance| instances << (create_new_instance instance) }
+      descendants.each { |descendant| instances.concat(descendant.all_instances) }
       instances
     end
 

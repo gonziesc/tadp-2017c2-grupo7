@@ -26,6 +26,15 @@ class Fixture
     book.name = "harry"
     book
   end
+
+  def bird
+    bird = Bird.new
+    bird.first_name = "juno"
+    bird.last_name = "esc"
+    bird.age = 1
+    bird.type = "bird"
+    bird
+  end
 end
 
 class Animal
@@ -48,6 +57,23 @@ class Person
   has_one Animal, named: :animal
   has_many Book, named: :books
 end
+
+module Accessories
+  include Persistence
+  has_one String, named: :type
+end
+
+class Wallet
+  include Accessories
+end
+
+
+class Bird < Animal
+  has_one String, named: :type
+end
+
+
+
 
 
 

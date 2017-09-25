@@ -4,6 +4,7 @@ require_relative("fixture.rb")
 describe "persistence" do
   fixture = Fixture.new
   let!(:person) {fixture.person}
+  let!(:bird) {fixture.bird}
 
     after(:each) do
       if File.exist? "./db/Person"
@@ -17,6 +18,9 @@ describe "persistence" do
       end
       if File.exist? "./db/Person_books"
         File.delete("./db/Person_books")
+      end
+      if File.exist? "./db/Bird"
+        File.delete("./db/Bird")
       end
     end
 
@@ -156,7 +160,20 @@ describe "persistence" do
       person.save!
       expect(Person.all_instances.first.books.first.name).to eq("harry")
     end
+  end
 
+  describe "Should be correct with inheritance and mixins" do
+    it "Should save animal and bird instances" do
+      person.save!
+      bird.save!
+      expect(Animal.all_instances.size).to eq(2)
+    end
+
+    it "Should bring both animals with name juno" do
+      person.save!
+      bird.save!
+      expect(Animal.find_by_first_name("juno").size).to eq(2)
+    end
   end
 
 end
