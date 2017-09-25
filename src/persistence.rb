@@ -9,24 +9,24 @@ module Persistence
   end
 
   module ClassPersistence
-    attr_accessor :persistible_fields
+    attr_accessor :sticky_fields
 
     def descendants
       ObjectSpace.each_object(Class).select { |klass| klass < self }
     end
 
     def has_one (type, hash)
-      @persistible_fields ||= []
-      if self.respond_to? "superclass" and self.superclass.instance_variable_get(:@persistible_fields)
-        superclass.instance_variable_get(:@persistible_fields).each {|field| @persistible_fields << field}
+      @sticky_fields ||= []
+      if self.respond_to? "superclass" and self.superclass.instance_variable_get(:@sticky_fields)
+        superclass.instance_variable_get(:@sticky_fields).each {|field| @sticky_fields << field}
       end
-      self.included_modules.each {|oneModule| define_module_persistible_fields oneModule}
-      @persistible_fields << (define_persistible_field hash[:named], type)
+      self.included_modules.each {|oneModule| define_module_sticky_fields oneModule}
+      @sticky_fields << (define_sticky_field hash[:named], type)
     end
 
-      def define_module_persistible_fields (oneModule)
-        if oneModule.respond_to? "persistible_fields"
-          oneModule.persistible_fields.each {|field| @persistible_fields << field}
+      def define_module_sticky_fields (oneModule)
+        if oneModule.respond_to? "sticky_fields"
+          oneModule.sticky_fields.each {|field| @sticky_fields << field}
         end
       end
 
@@ -35,7 +35,7 @@ module Persistence
       has_one type, hash
     end
 
-    def define_persistible_field (name, type)
+    def define_sticky_field (name, type)
       attr_accessor(name)
       {name: name, type: type}
     end
@@ -50,7 +50,7 @@ module Persistence
 
     def create_new_instance (attributes)
       instance = self.new
-      @persistible_fields.each { |field| initialize_by_type instance, field[:name], field[:type], attributes }
+      @sticky_fields.each { |field| initialize_by_type instance, field[:name], field[:type], attributes }
       instance.instance_variable_set("@id", attributes[:id])
       instance
     end
@@ -108,9 +108,9 @@ module Persistence
 
     def save!
       hash = {}
-      self.class.persistible_fields.each { |field| hash.merge!(save_field field) }
+      self.class.sticky_fields.each { |field| hash.merge!(save_field field) }
       id = table.insert(hash)
-      self.class.persistible_fields.select { |field| self.instance_variable_get("@#{field[:name]}").is_a? Array }
+      self.class.sticky_fields.select { |field| self.instance_variable_get("@#{field[:name]}").is_a? Array }
           .each { |field| create_hash_for_many field[:name], id }
       @id = id
     end
@@ -148,7 +148,7 @@ module Persistence
     def refresh!
       if @id
         instance = @table.entries.find{ |i| i[:id] == @id }
-        self.class.persistible_fields.each { |field| refresh_field field, instance}
+        self.class.sticky_fields.each { |field| refresh_field field, instance}
       else
         raise("Este objeto no tiene id!")
       end

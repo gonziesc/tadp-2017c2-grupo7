@@ -51,10 +51,10 @@ describe "persistence" do
     expect(person.first_name).to eq("gonza")
   end
 
-  # it "Should raise exception because of no saving" do
-  #  person.first_name = "asd"
-  #  expect(person.refresh!).to raise("Este objeto no tiene id!")
-  # end
+  it "Should raise exception because of no saving" do
+    person.first_name = "asd"
+    expect{(person.refresh!)}.to raise_error("Este objeto no tiene id!")
+   end
 
   it "Should forget id after forgetting" do
     person.save!
@@ -100,9 +100,9 @@ describe "persistence" do
       expect(Person.find_by_id(person.id).size).to eq(1)
     end
 
-   # it "Should raise error method missing" do
-   #   expect(Person.find_by_asdasd()).to raise_error("El metodo no existe o tiene parametros")
-   # end
+    it "Should raise error method missing" do
+      expect{(Person.find_by_asdasd())}.to raise_error("El metodo no existe o tiene parametros")
+    end
   end
 
   describe "having persisting objetcs" do
@@ -174,6 +174,9 @@ describe "persistence" do
       bird.save!
       expect(Animal.find_by_first_name("juno").size).to eq(2)
     end
+
+    ## TODO: refactor sticky fields, define getter for lazy, change for hash with unique name key
+    ## not working: linealization of modules including persistence
   end
 
 end
