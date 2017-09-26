@@ -175,7 +175,7 @@ describe "persistence" do
       expect(Animal.find_by_first_name("juno").size).to eq(2)
     end
 
-    ## TODO: refactor sticky fields, define getter for lazy, change for hash with unique name key
+    ## TODO: define getter for lazy, change for hash with unique name key
     ## not working: linealization of modules including persistence
   end
 
