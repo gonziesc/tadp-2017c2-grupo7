@@ -45,9 +45,8 @@ module Persistence
     end
 
     def all_instances
-      instances = []
       table = TADB::DB.table(self.name)
-      table.entries.each { |instance| instances << (create_new_instance instance) }
+      instances = table.entries.flat_map { |instance|  (create_new_instance instance) }
       descendants.each { |descendant| instances.concat(descendant.all_instances) }
       instances
     end
