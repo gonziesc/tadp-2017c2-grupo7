@@ -72,6 +72,11 @@ class Bird < Animal
   has_one String, named: :type
 end
 
+class Dummy
+  include Persistence
+  has_one Numeric, named: :dummy
+  has_one String, named: :dummy
+end
 
 
 

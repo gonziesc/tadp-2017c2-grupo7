@@ -24,6 +24,10 @@ describe "persistence" do
       end
     end
 
+    it "Should have replaced dummy attribute type" do
+    expect(Dummy.sticky_fields[:dummy]).to eq(String)
+    end
+
     it "Should have persistable attributes" do
       expect(person).to respond_to(:first_name)
       expect(person).to respond_to(:last_name)
@@ -175,7 +179,6 @@ describe "persistence" do
       expect(Animal.find_by_first_name("juno").size).to eq(2)
     end
 
-    ## TODO: define getter for lazy, change for hash with unique name key
     ## not working: linealization of modules including persistence
   end
 
