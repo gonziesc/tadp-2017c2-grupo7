@@ -5,6 +5,7 @@ describe "persistence" do
   fixture = Fixture.new
   let!(:person) {fixture.person}
   let!(:bird) {fixture.bird}
+  let!(:validation) {fixture.validation}
 
     after(:each) do
       if File.exist? "./db/Person"
@@ -21,6 +22,9 @@ describe "persistence" do
       end
       if File.exist? "./db/Bird"
         File.delete("./db/Bird")
+      end
+      if File.exist? "./db/Validation"
+        File.delete("./db/Validation")
       end
     end
 
@@ -180,6 +184,43 @@ describe "persistence" do
     end
 
     ## not working: linealization of modules including persistence
+  end
+
+  describe "Should be correct with validations" do
+    it "Should save the validations" do
+      expect{(validation.save!)}.to_not raise_error()
+    end
+
+    it "Should fail the validations" do
+      validation.num = "asd"
+      expect{(validation.save!)}.to raise_error("Error de tipos")
+    end
+
+    it "Should fail the validations" do
+      validation.num = "asd"
+      expect{(validation.save!)}.to raise_error("Error de tipos")
+    end
+
+    it "Should fail the validations" do
+      validation.string = 8
+      expect{(validation.save!)}.to raise_error("Error de tipos")
+    end
+
+    it "Should fail the validations" do
+      validation.bool = "asd"
+      expect{(validation.save!)}.to raise_error("Error de tipos")
+    end
+
+    it "Should fail the validations" do
+      validation.animal.first_name = 8
+      expect{(validation.save!)}.to raise_error("Error de tipos")
+    end
+
+    it "Should fail the validations" do
+      validation.books.first.name = 8
+      expect{(validation.save!)}.to raise_error("Error de tipos")
+    end
+
   end
 
 end

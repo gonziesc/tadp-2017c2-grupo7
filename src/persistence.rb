@@ -112,6 +112,7 @@ module Persistence
     end
 
     def save!
+      validate!
       hash = {}
       self.class.sticky_fields.each do
          |name, type| hash.merge!(save_field name)
@@ -122,21 +123,6 @@ module Persistence
       end
       @id = id
       end
-
-    def save_field (name)
-      hash = {}
-      value = self.instance_variable_get("@#{name}")
-      if is_a_primitive_type? value
-        hash[name] = value
-      else if value.is_a? Array
-             hash[name] = self.class.name + "_" + name.to_s
-           else
-             value.save!
-             hash[name] =  value.id
-           end
-      end
-      hash
-    end
 
     def create_hash_for_many (name, selfId)
       list = self.instance_variable_get("@#{name}")
@@ -163,6 +149,43 @@ module Persistence
         end
       else
         raise("Este objeto no tiene id!")
+      end
+    end
+
+    def validate!
+      self.class.sticky_fields.each do
+        |name, type| validate_field(name, type)
+      end
+    end
+
+    ## This three methods could abstract logic? 
+
+    def save_field (name)
+      hash = {}
+      value = self.instance_variable_get("@#{name}")
+      if is_a_primitive_type? value
+        hash[name] = value
+      else if value.is_a? Array
+             hash[name] = self.class.name + "_" + name.to_s
+           else
+             value.save!
+             hash[name] =  value.id
+           end
+      end
+      hash
+    end
+
+    def validate_field (name, type)
+      value = self.instance_variable_get("@#{name}")
+      if self.is_a_primitive_type? value
+        unless value.is_a? type
+          raise("Error de tipos")
+        end
+      else if value.is_a? Array
+             value.each {|obj| obj.validate!}
+           else
+             value.validate!
+           end
       end
     end
 

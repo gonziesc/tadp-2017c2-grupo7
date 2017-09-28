@@ -35,6 +35,18 @@ class Fixture
     bird.type = "bird"
     bird
   end
+
+  def validation
+    validation = Validations.new
+    validation.num = 8
+    validation.string = "asd"
+    validation.bool = true
+    aBook = book
+    anotherBook = book
+    validation.books = [aBook, anotherBook]
+    validation.animal = animal
+    validation
+  end
 end
 
 class Animal
@@ -78,6 +90,14 @@ class Dummy
   has_one String, named: :dummy
 end
 
+class Validations
+  include Persistence
+  has_one Numeric, named: :num
+  has_one String, named: :string
+  has_one Boolean, named: :bool
+  has_many Book, named: :books
+  has_one Animal, named: :animal
+end
 
 
 
