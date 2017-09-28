@@ -18,30 +18,42 @@ module Persistence
     def new
       instance = super
       @sticky_fields ||= {}
+      set_default_for_instance instance
+      instance
+    end
+
+    def set_default_for_instance (instance)
       @sticky_fields.each do
       |name, type|
         if @sticky_validations[name][:default]
           instance.instance_variable_set("@#{name}", @sticky_validations[name][:default])
         end
       end
-      instance
     end
 
     def has_one (type, hash)
       @sticky_fields ||= {}
       @sticky_validations ||= {}
-      if self.respond_to? "superclass" and self.superclass.instance_variable_get(:@sticky_fields)
-        superclass.instance_variable_get(:@sticky_fields).each do
-        |name, type| @sticky_fields[name] = type
-        end
-        superclass.instance_variable_get(:@sticky_validations).each do
-        |name, validations| @sticky_validations[name] = validations
-        end
+      if superclass_is_sticky?
+        define_sticky_superclass
       end
       included_modules.each {|oneModule| define_module_sticky_fields oneModule}
       define_sticky_field hash[:named]
       @sticky_fields[hash[:named]] = type
       @sticky_validations[hash[:named]] = hash.reject!{ |k| k == :named }
+    end
+
+    def superclass_is_sticky?
+      self.respond_to? "superclass" and self.superclass.instance_variable_get(:@sticky_fields)
+    end
+
+    def define_sticky_superclass
+      superclass.instance_variable_get(:@sticky_fields).each do
+      |name, type| @sticky_fields[name] = type
+      end
+      superclass.instance_variable_get(:@sticky_validations).each do
+      |name, validations| @sticky_validations[name] = validations
+      end
     end
 
     def define_module_sticky_fields (oneModule)
@@ -103,14 +115,16 @@ module Persistence
     def method_missing(sym, *args, &block)
       method = sym.to_s
       if method.start_with? 'find_by'
-        instance_method = method[8..-1]
+        instance_method = get_method_name method
         find_by instance_method, args[0]
       else
         super(sym, *args, &block)
       end
     end
 
-    private
+    def get_method_name (method)
+      method[8..-1]
+    end
 
     def find_by (instance_method, arg)
       if self.method_defined? instance_method and self.instance_method(instance_method).arity == 0
