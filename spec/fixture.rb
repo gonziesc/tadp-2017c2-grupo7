@@ -97,6 +97,7 @@ class Validations
   has_one Boolean, named: :bool, no_blank: true
   has_many Book, named: :books
   has_one Animal, named: :animal,validate: proc{ age > 0 }
+  has_one String, named: :default_string,default: "String"
 end
 
 

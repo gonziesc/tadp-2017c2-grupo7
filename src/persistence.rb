@@ -15,6 +15,17 @@ module Persistence
       ObjectSpace.each_object(Class).select { |klass| klass < self }
     end
 
+    def new
+      instance = super
+      @sticky_fields.each do
+      |name, type|
+        if @sticky_validations[name][:default]
+          instance.instance_variable_set("@#{name}", @sticky_validations[name][:default])
+        end
+      end
+      instance
+    end
+
     def has_one (type, hash)
       @sticky_fields ||= {}
       @sticky_validations ||= {}
@@ -170,39 +181,45 @@ module Persistence
     def save_field (name)
       hash = {}
       value = self.instance_variable_get("@#{name}")
-      if is_a_primitive_type? value
-        hash[name] = value
-      else if value.is_a? Array
-             hash[name] = self.class.name + "_" + name.to_s
-           else
-             value.save!
-             hash[name] =  value.id
-           end
+      unless value == nil
+        if is_a_primitive_type? value
+          hash[name] = value
+        else if value.is_a? Array
+               hash[name] = self.class.name + "_" + name.to_s
+             else
+               value.save!
+               hash[name] =  value.id
+             end
+        end
       end
       hash
     end
 
     def validate_field (name, type)
       value = self.instance_variable_get("@#{name}")
-      if self.is_a_primitive_type? value
-        self.class.sticky_validations[name].each do
-        |name, validation| send(name, value, validation)
-        end
-        unless value.is_a? type
-          raise("Error de tipos")
+      unless value == nil
+        if self.is_a_primitive_type? value
+          self.class.sticky_validations[name].each do
+          |valid_name, validation| send(valid_name, value, validation, name)
+          end
+          unless value.is_a? type
+            raise("Error de tipos")
+          end
+        else
+          if value.is_a? Array
+            value.each {|obj| obj.validate!}
+            value.each {|obj| self.class.sticky_validations[name].each do
+            |valid_name, validation| obj.send(valid_name, value, validation, name)
+            end}
+          else
+            self.class.sticky_validations[name].each do
+            |valid_name, validation| value.send(valid_name, value, validation, name)
+            end
+            value.validate!
+          end
         end
       else
-        if value.is_a? Array
-          value.each {|obj| obj.validate!}
-          value.each {|obj| self.class.sticky_validations[name].each do
-          |name, validation| obj.send(name, value, validation)
-          end}
-        else
-          self.class.sticky_validations[name].each do
-          |name, validation| value.send(name, value, validation)
-          end
-          value.validate!
-        end
+        send("default", value, self.class.sticky_validations[name][:default], name)
       end
     end
 
@@ -224,7 +241,7 @@ module Persistence
       remove_instance_variable(:@id)
     end
 
-    def no_blank (value, validation)
+    def no_blank (value, validation, name)
       if value.is_a? Boolean and validation == true
         if value == nil or value == ""
           raise("Error de tipos")
@@ -232,14 +249,14 @@ module Persistence
       end
     end
 
-    def validate (value, proc)
+    def validate (value, proc, name)
       unless self.instance_eval(&proc)
         raise("Error de tipos")
       end
     end
 
     ## Abstract to and from
-    def from (value, validation)
+    def from (value, validation, name)
       if value.is_a? Numeric
         if value < validation
           raise("Error de tipos")
@@ -247,7 +264,13 @@ module Persistence
       end
     end
 
-    def to (value, validation)
+    def default (value, validation, name)
+      if value == nil
+        self.instance_variable_set("@#{name}", validation)
+      end
+    end
+
+    def to (value, validation, name)
       if value.is_a? Numeric
         if value > validation
           raise("Error de tipos")

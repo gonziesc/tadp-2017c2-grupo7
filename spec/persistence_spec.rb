@@ -24,7 +24,10 @@ describe "persistence" do
         File.delete("./db/Bird")
       end
       if File.exist? "./db/Validation"
-        File.delete("./db/Validation")
+        File.delete("./db/Validations")
+      end
+      if File.exist? "./db/Validation_books"
+        File.delete("./db/Validations_books")
       end
     end
 
@@ -241,6 +244,18 @@ describe "persistence" do
       expect{(validation.save!)}.to raise_error("Error de tipos")
     end
 
+  end
+
+  describe "default" do
+    it "Should have default value" do
+      expect(validation.default_string).to eq("String")
+    end
+
+    it "Should have default value" do
+      validation.default_string = nil
+      validation.save!
+      expect(validation.default_string).to eq("String")
+    end
   end
 
 end
