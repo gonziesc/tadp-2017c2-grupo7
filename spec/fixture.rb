@@ -76,6 +76,7 @@ module Accessories
 end
 
 class Wallet
+  include Persistence
   include Accessories
 end
 

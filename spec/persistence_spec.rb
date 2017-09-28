@@ -23,11 +23,14 @@ describe "persistence" do
       if File.exist? "./db/Bird"
         File.delete("./db/Bird")
       end
-      if File.exist? "./db/Validation"
+      if File.exist? "./db/Validations"
         File.delete("./db/Validations")
       end
-      if File.exist? "./db/Validation_books"
+      if File.exist? "./db/Validations_books"
         File.delete("./db/Validations_books")
+      end
+      if File.exist? "./db/Wallet"
+        File.delete("./db/Wallet")
       end
     end
 
@@ -186,7 +189,18 @@ describe "persistence" do
       expect(Animal.find_by_first_name("juno").size).to eq(2)
     end
 
-    ## not working: linealization of modules including persistence
+    # TESTS NOT WORKING WITH LINEALIZATION
+    it "Should work with mixins linealization" do
+      wallet = Wallet.new
+      wallet.type = "purse"
+      wallet.save!
+      expect(Wallet.all_instances.first.type).to eq("purse")
+    end
+
+    it "Should work with mixins linealization" do
+      expect(Wallet.sticky_fields[:purse]).to eq(String)
+    end
+    # TESTS NOT WORKING WITH LINEALIZATION
   end
 
   describe "Should be correct with validations" do

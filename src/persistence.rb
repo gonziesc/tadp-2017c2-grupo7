@@ -17,6 +17,7 @@ module Persistence
 
     def new
       instance = super
+      @sticky_fields ||= {}
       @sticky_fields.each do
       |name, type|
         if @sticky_validations[name][:default]
@@ -37,7 +38,7 @@ module Persistence
         |name, validations| @sticky_validations[name] = validations
         end
       end
-      self.included_modules.each {|oneModule| define_module_sticky_fields oneModule}
+      included_modules.each {|oneModule| define_module_sticky_fields oneModule}
       define_sticky_field hash[:named]
       @sticky_fields[hash[:named]] = type
       @sticky_validations[hash[:named]] = hash.reject!{ |k| k == :named }
