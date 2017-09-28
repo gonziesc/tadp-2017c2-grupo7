@@ -9,7 +9,7 @@ module Persistence
   end
 
   module ClassPersistence
-    attr_accessor :sticky_fields
+    attr_accessor :sticky_fields, :sticky_validations
 
     def descendants
       ObjectSpace.each_object(Class).select { |klass| klass < self }
@@ -17,23 +17,28 @@ module Persistence
 
     def has_one (type, hash)
       @sticky_fields ||= {}
+      @sticky_validations ||= {}
       if self.respond_to? "superclass" and self.superclass.instance_variable_get(:@sticky_fields)
         superclass.instance_variable_get(:@sticky_fields).each do
-          |name, type| @sticky_fields[name] = type
+        |name, type| @sticky_fields[name] = type
+        end
+        superclass.instance_variable_get(:@sticky_validations).each do
+        |name, validations| @sticky_validations[name] = validations
         end
       end
       self.included_modules.each {|oneModule| define_module_sticky_fields oneModule}
       define_sticky_field hash[:named]
       @sticky_fields[hash[:named]] = type
+      @sticky_validations[hash[:named]] = hash.reject!{ |k| k == :named }
     end
 
-      def define_module_sticky_fields (oneModule)
-        if oneModule.respond_to? "sticky_fields"
-          oneModule.sticky_fields.each do
-          |name, type| @sticky_fields[name] = type
-          end
+    def define_module_sticky_fields (oneModule)
+      if oneModule.respond_to? "sticky_fields"
+        oneModule.sticky_fields.each do
+        |name, type| @sticky_fields[name] = type
         end
       end
+    end
 
 
     def has_many (type, hash)
@@ -54,11 +59,13 @@ module Persistence
     def create_new_instance (attributes)
       instance = self.new
       @sticky_fields.each do
-         |name, type| initialize_by_type instance, name, type, attributes
+      |name, type| initialize_by_type instance, name, type, attributes
       end
       instance.instance_variable_set("@id", attributes[:id])
       instance
     end
+
+    ## Abstract logic with the last 3 methods?
 
     def initialize_by_type (instance, name, type, attributes)
       value = attributes[name]
@@ -115,14 +122,14 @@ module Persistence
       validate!
       hash = {}
       self.class.sticky_fields.each do
-         |name, type| hash.merge!(save_field name)
+      |name, type| hash.merge!(save_field name)
       end
       id = table.insert(hash)
       self.class.sticky_fields.select { |name, type| self.instance_variable_get("@#{name}").is_a? Array }
           .each do  |name, type| create_hash_for_many name, id
       end
       @id = id
-      end
+    end
 
     def create_hash_for_many (name, selfId)
       list = self.instance_variable_get("@#{name}")
@@ -145,7 +152,7 @@ module Persistence
       if @id
         instance = @table.entries.find{ |i| i[:id] == @id }
         self.class.sticky_fields.each do
-           |name, type| refresh_field name, instance
+        |name, type| refresh_field name, instance
         end
       else
         raise("Este objeto no tiene id!")
@@ -154,11 +161,11 @@ module Persistence
 
     def validate!
       self.class.sticky_fields.each do
-        |name, type| validate_field(name, type)
+      |name, type| validate_field(name, type)
       end
     end
 
-    ## This three methods could abstract logic? 
+    ## This 3 methods could abstract logic?
 
     def save_field (name)
       hash = {}
@@ -178,14 +185,24 @@ module Persistence
     def validate_field (name, type)
       value = self.instance_variable_get("@#{name}")
       if self.is_a_primitive_type? value
+        self.class.sticky_validations[name].each do
+        |name, validation| send(name, value, validation)
+        end
         unless value.is_a? type
           raise("Error de tipos")
         end
-      else if value.is_a? Array
-             value.each {|obj| obj.validate!}
-           else
-             value.validate!
-           end
+      else
+        if value.is_a? Array
+          value.each {|obj| obj.validate!}
+          value.each {|obj| self.class.sticky_validations[name].each do
+          |name, validation| obj.send(name, value, validation)
+          end}
+        else
+          self.class.sticky_validations[name].each do
+          |name, validation| value.send(name, value, validation)
+          end
+          value.validate!
+        end
       end
     end
 
@@ -207,5 +224,35 @@ module Persistence
       remove_instance_variable(:@id)
     end
 
+    def no_blank (value, validation)
+      if value.is_a? Boolean and validation == true
+        if value == nil or value == ""
+          raise("Error de tipos")
+        end
+      end
+    end
+
+    def validate (value, proc)
+      unless self.instance_eval(&proc)
+        raise("Error de tipos")
+      end
+    end
+
+    ## Abstract to and from
+    def from (value, validation)
+      if value.is_a? Numeric
+        if value < validation
+          raise("Error de tipos")
+        end
+      end
+    end
+
+    def to (value, validation)
+      if value.is_a? Numeric
+        if value > validation
+          raise("Error de tipos")
+        end
+      end
+    end
   end
 end

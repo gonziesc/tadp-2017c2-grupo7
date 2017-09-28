@@ -38,7 +38,7 @@ class Fixture
 
   def validation
     validation = Validations.new
-    validation.num = 8
+    validation.num = 28
     validation.string = "asd"
     validation.bool = true
     aBook = book
@@ -92,11 +92,11 @@ end
 
 class Validations
   include Persistence
-  has_one Numeric, named: :num
+  has_one Numeric, named: :num, from: 18, to: 100
   has_one String, named: :string
-  has_one Boolean, named: :bool
+  has_one Boolean, named: :bool, no_blank: true
   has_many Book, named: :books
-  has_one Animal, named: :animal
+  has_one Animal, named: :animal,validate: proc{ age > 0 }
 end
 
 
