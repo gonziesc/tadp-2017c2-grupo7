@@ -90,22 +90,27 @@ module Persistence
     end
 
     ## Abstract logic with the last 3 methods?
+    ## The logic is: if is a primitive type, else if a has_many, else
 
     def initialize_by_type (instance, name, type, attributes)
       value = attributes[name]
       if is_a_primitive_type? (type.to_s)
         instance.instance_variable_set("@#{name}", value)
       else if value.is_a? String and value.start_with? self.name
-             many_table = TADB::DB.table(value)
-             has_many_instances = many_table.entries().select {|entry| entry[:self_id] == attributes[:id]}
-             real_instances = []
-             has_many_instances.each {|instance| real_instances << (type.find_by_id(instance[:foreign_key]).first)}
-             instance.instance_variable_set("@#{name}", real_instances)
+             initialize_has_many value, instance, name, type, attributes
            else
              has_one_instance = type.find_by_id(value).first
              instance.instance_variable_set("@#{name}", has_one_instance)
            end
       end
+    end
+
+    def initialize_has_many (value, instance, name, type, attributes)
+      many_table = TADB::DB.table(value)
+      has_many_instances = many_table.entries().select {|entry| entry[:self_id] == attributes[:id]}
+      real_instances = []
+      has_many_instances.each {|instance| real_instances << (type.find_by_id(instance[:foreign_key]).first)}
+      instance.instance_variable_set("@#{name}", real_instances)
     end
 
     def is_a_primitive_type? (type)
@@ -144,17 +149,29 @@ module Persistence
       @id = nil
     end
 
+    def sticky_fields
+      self.class.sticky_fields
+    end
+
+    def sticky_validations
+      self.class.sticky_validations
+    end
+
     def save!
       validate!
       hash = {}
-      self.class.sticky_fields.each do
+      sticky_fields.each do
       |name, type| hash.merge!(save_field name)
       end
       id = table.insert(hash)
-      self.class.sticky_fields.select { |name, type| self.instance_variable_get("@#{name}").is_a? Array }
+      save_has_many_fields id
+      @id = id
+    end
+
+    def save_has_many_fields (id)
+      sticky_fields.select { |name, type| self.instance_variable_get("@#{name}").is_a? Array }
           .each do  |name, type| create_hash_for_many name, id
       end
-      @id = id
     end
 
     def create_hash_for_many (name, selfId)
@@ -170,14 +187,14 @@ module Persistence
       {"foreign_key" => id, "self_id" => selfId}
     end
 
-    def is_a_primitive_type? value
+    def is_a_primitive_type? (value)
       value.is_a? String or value.is_a? Numeric or value.is_a? Boolean
     end
 
     def refresh!
       if @id
         instance = @table.entries.find{ |i| i[:id] == @id }
-        self.class.sticky_fields.each do
+        sticky_fields.each do
         |name, type| refresh_field name, instance
         end
       else
@@ -186,12 +203,14 @@ module Persistence
     end
 
     def validate!
-      self.class.sticky_fields.each do
+      sticky_fields.each do
       |name, type| validate_field(name, type)
       end
     end
 
     ## This 3 methods could abstract logic?
+    ## Duplicated logic: if is a primitive type, else if is an array, else
+    ## How could this be abstracted?
 
     def save_field (name)
       hash = {}
@@ -210,34 +229,6 @@ module Persistence
       hash
     end
 
-    def validate_field (name, type)
-      value = self.instance_variable_get("@#{name}")
-      unless value == nil
-        if self.is_a_primitive_type? value
-          self.class.sticky_validations[name].each do
-          |valid_name, validation| send(valid_name, value, validation, name)
-          end
-          unless value.is_a? type
-            raise("Error de tipos")
-          end
-        else
-          if value.is_a? Array
-            value.each {|obj| obj.validate!}
-            value.each {|obj| self.class.sticky_validations[name].each do
-            |valid_name, validation| obj.send(valid_name, value, validation, name)
-            end}
-          else
-            self.class.sticky_validations[name].each do
-            |valid_name, validation| value.send(valid_name, value, validation, name)
-            end
-            value.validate!
-          end
-        end
-      else
-        send("default", value, self.class.sticky_validations[name][:default], name)
-      end
-    end
-
     def refresh_field (name, instance)
       value = instance[name]
       actualValue =  self.instance_variable_get("@#{name}")
@@ -248,6 +239,33 @@ module Persistence
            else
              actualValue.refresh!
            end
+      end
+    end
+
+    ## This is a complicated method
+
+    def validate_field (name, type)
+      value = self.instance_variable_get("@#{name}")
+      unless value == nil
+        if self.is_a_primitive_type? value
+          sticky_validations[name].each do
+          |valid_name, validation| send(valid_name, value, validation, name)
+          end
+          unless value.is_a? type
+            raise("Error de tipos")
+          end
+        else
+          if value.is_a? Array
+            value.each {|obj| obj.validate!}
+          else
+            sticky_validations[name].each do
+              |valid_name, validation| value.send(valid_name, value, validation, name)
+            end
+            value.validate!
+          end
+        end
+      else
+        send("default", value, sticky_validations[name][:default], name)
       end
     end
 
