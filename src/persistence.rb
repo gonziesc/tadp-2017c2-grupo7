@@ -18,6 +18,39 @@ module ClassPersistence
     @persistable_fields[name]=type
   end
 
+  def all_instances
+    self.db.entries.collect {|hash| self.instance_from hash[:id]}
+  end
+
+  def instance_from(id)
+    instance = self.new
+    instance.instance_variable_set('@id', id)
+    instance.refresh!
+    return instance
+  end
+
+  def method_missing(symbol, *args, &block)
+    if symbol.to_s.start_with?('search_by_')
+      self.search_using symbol, *args, &block
+    else
+      super symbol, *args, &block
+    end
+  end
+
+  # Logic for this method MUST match that of the detection in method_missing
+  def respond_to_missing?(method_name, include_private = false)
+    method_name.to_s.start_with?('search_by_') || super
+  end
+
+  def search_using(symbol, *args, &block)
+    method_name = symbol.to_s.tap{|s| s.slice!('search_by_')}
+    if self.instance_methods.include?(method_name.to_sym) and self.instance_method(method_name).arity == 0
+      self.all_instances.select{|instance| instance.send(method_name) == args.first}
+    else
+      raise(" Falla! No existe el mensaje porque #{method_name} no esta definido o recibe args.")
+    end
+  end
+
 end
 
 module InstancePersistence
@@ -58,7 +91,7 @@ module InstancePersistence
         self.instance_variable_set("@#{name}", value)
       end
     else
-      raise("Falla! Este objeto no tiene id!")
+      raise('Falla! Este objeto no tiene id!')
     end
   end
 
@@ -68,6 +101,8 @@ module InstancePersistence
       @id = nil
       end
   end
+
+
 
   def persisted_hash
     self.db.entries.detect {|hash| hash[:id] == @id}
