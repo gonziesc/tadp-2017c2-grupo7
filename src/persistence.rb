@@ -5,18 +5,20 @@ class FalseClass; include Boolean; end
 
 module ClassPersistence
 
-  attr_accessor :persistable_fields
+  attr_accessor :own_persistable_fields
 
   def db
     TADB::DB.table(self.name)
   end
 
   def has_one(type, hash)
-    @persistable_fields ||= {}
+    @own_persistable_fields ||= {}
     name = hash[:named]
     attr_accessor(name)
-    @persistable_fields[name]=type
+    @own_persistable_fields[name]=type
   end
+
+  ## ----------------------------------------------------------------------------Punto 2--------------------------------
 
   def all_instances
     self.db.entries.collect {|hash| self.instance_from hash[:id]}
@@ -30,7 +32,7 @@ module ClassPersistence
   end
 
   def method_missing(symbol, *args, &block)
-    if symbol.to_s.start_with?('search_by_')
+    if symbol.to_s.start_with?('find_by_')
       self.search_using symbol, *args, &block
     else
       super symbol, *args, &block
@@ -39,17 +41,33 @@ module ClassPersistence
 
   # Logic for this method MUST match that of the detection in method_missing
   def respond_to_missing?(method_name, include_private = false)
-    method_name.to_s.start_with?('search_by_') || super
+    method_name.to_s.start_with?('find_by_') || super
   end
 
   def search_using(symbol, *args, &block)
-    method_name = symbol.to_s.tap{|s| s.slice!('search_by_')}
+    method_name = symbol.to_s.tap{|s| s.slice!('find_by_')}
     if self.instance_methods.include?(method_name.to_sym) and self.instance_method(method_name).arity == 0
       self.all_instances.select{|instance| instance.send(method_name) == args.first}
     else
       raise(" Falla! No existe el mensaje porque #{method_name} no esta definido o recibe args.")
     end
   end
+
+  ## ----------------------------------------------------------------------------Punto 3--------------------------------
+
+  def persistable_fields
+    (@own_persistable_fields || {}).merge(self.included_modules_persistable_fields).merge(self.superclass_persistable_fields)
+  end
+
+  def included_modules_persistable_fields
+    mods = self.included_modules.select{|mod| mod.respond_to? :persistable_fields}
+    mods.inject({}) {|hash, mod| hash.merge(mod.persistable_fields)}
+  end
+
+  def superclass_persistable_fields
+    self.superclass.respond_to?(:persistable_fields) ? self.superclass.persistable_fields : {}
+  end
+
 
 end
 
@@ -72,7 +90,7 @@ module InstancePersistence
   def persistable_hash
     hash = {}
     self.persistable_fields.each do |name, type|
-      hash[name] = self.instance_variable_get("@#{name}")
+      hash[name] = self.persistable_object_for name
     end
     if @id
       hash[:id]= @id
@@ -82,13 +100,14 @@ module InstancePersistence
   end
 
   def save!
+    self.validate!
     @id = self.db.insert(self.persistable_hash)
   end
 
   def refresh!
     if @id
       self.persisted_hash.each do |name, value|
-        self.instance_variable_set("@#{name}", value)
+        self.instance_variable_set("@#{name}", self.persisted_object_named_value(name,value))
       end
     else
       raise('Falla! Este objeto no tiene id!')
@@ -102,12 +121,51 @@ module InstancePersistence
       end
   end
 
-
-
   def persisted_hash
     self.db.entries.detect {|hash| hash[:id] == @id}
   end
 
+  ## ----------------------------------------------------------------------------Punto 3--------------------------------
+
+  def persistable_object_for(name)
+    var = self.instance_variable_get("@#{name}")
+    if var.respond_to? :save!
+      var.save!
+    else
+      var
+    end
+  end
+
+  def persisted_object_named_value(name, value)
+    klass = persistable_fields[name]
+    if klass.respond_to? :find_by_id
+        klass.find_by_id(value)
+    else
+      value
+    end
+  end
+
+  ## ----------------------------------------------------------------------------Punto 4--------------------------------
+
+  def validate!
+    self.validate_type(name, type)
+    self.validate_no_blank
+    self.validate_from
+    self.validate_to
+    self.validate_validate
+  end
+
+  def validate_block_for(&block)
+
+  end
+
+  def validateType
+    self.persistable_fields.each do |name, type|
+      if not self.instance_variable_get("@#{name}").is_a? type
+        raise("El atributo @#{name} deberia ser de tipo #{type}")
+      end
+    end
+  end
 end
 
 class Class
