@@ -12,7 +12,7 @@ module Persistence
     attr_accessor :sticky_fields, :table
 
     def sticky_fields
-
+      @sticky_fields ||= { id: String }
     end
 
     def table
@@ -20,38 +20,34 @@ module Persistence
     end
 
     def has_one (type, hash)
-      @sticky_fields ||= { id: String }
       attr_accessor(hash[:named])
-      @sticky_fields[hash[:named]] = type
+      sticky_fields[hash[:named]] = type
     end
 
     def save!(instance)
       id = table.upsert(instance)
       instance.instance_variable_set("@id", id)
-      redefine_refresh
-    end
-
-    def redefine_refresh
-      define_singleton_method(:refresh!) do |instance|
-          savedInstance = @table.entries.find{ |i| i[:id] == instance.id }
-          @sticky_fields.each do
-            |name, type| instance.instance_variable_set("@#{name}", savedInstance[name])
-          end
-      end
     end
 
     def forget!(instance)
-      @table.delete(instance.id)
+      table.delete(instance.id)
       instance.instance_variable_set("@id", nil)
     end
 
     def refresh!(instance)
-      raise("Este objeto no tiene id!")
+      if (instance.id)
+        savedInstance = table.entries.find{ |i| i[:id] == instance.id }
+        sticky_fields.each do
+        |name, type| instance.instance_variable_set("@#{name}", savedInstance[name])
+        end
+      else
+        raise("Este objeto no tiene id!")
+      end
     end
 
     def to_hash(instance)
       hash = {}
-      @sticky_fields.each {|name, type| hash[name] = instance.instance_variable_get("@#{name}")}
+      sticky_fields.each {|name, type| hash[name] = instance.instance_variable_get("@#{name}")}
       hash
     end
 
@@ -63,13 +59,12 @@ module Persistence
 
     def create_new_instance (attributes)
       instance = self.new
-      @sticky_fields.each do
+      sticky_fields.each do
       |name, type| initialize_by_type instance, name, type, attributes
       end
       instance.instance_variable_set("@id", attributes[:id])
       instance
     end
-
 
     def method_missing(sym, *args, &block)
       method = sym.to_s
