@@ -4,8 +4,6 @@ require_relative("fixture.rb")
 describe "persistence" do
   fixture = Fixture.new
   let!(:person) {fixture.person}
-  let!(:bird) {fixture.bird}
-  let!(:validation) {fixture.validation}
 
     after(:each) do
       if File.exist? "./db/Person"
@@ -32,10 +30,6 @@ describe "persistence" do
       if File.exist? "./db/Wallet"
         File.delete("./db/Wallet")
       end
-    end
-
-    it "Should have replaced dummy attribute type" do
-    expect(Dummy.sticky_fields[:dummy]).to eq(String)
     end
 
     it "Should have persistable attributes" do
@@ -67,7 +61,7 @@ describe "persistence" do
 
   it "Should raise exception because of no saving" do
     person.first_name = "asd"
-    expect{(person.refresh!)}.to raise_error("Este objeto no tiene id!")
+    expect{person.refresh!}.to raise_error("Este objeto no tiene id!")
    end
 
   it "Should forget id after forgetting" do
@@ -118,158 +112,4 @@ describe "persistence" do
       expect{(Person.find_by_asdasd())}.to raise_error("El metodo no existe o tiene parametros")
     end
   end
-
-  describe "having persisting objetcs" do
-    it "Should have persistable attributes" do
-      expect(person.animal.first_name).to eq("juno")
-      expect(person.animal.age).to eq(1)
-    end
-
-    it "Should have id after save" do
-      person.save!
-      expect(person.animal.id).not_to eq(nil)
-    end
-
-    it "Should have name after save" do
-      person.save!
-      expect(person.animal.age).to eq(1)
-    end
-
-    it "Should all instances bring the complete person" do
-      person.save!
-      expect(Person.all_instances.first.animal.age).to eq(1)
-    end
-
-    it "Should change attribute after refreshing" do
-      person.save!
-      animal = person.animal
-      animal.age = 2
-      animal.save!
-      person.refresh!
-      expect(person.animal.age).to eq(2)
-    end
-  end
-
-  describe "has many" do
-    it "Should have 3 books after adding one" do
-      book = fixture.book
-      person.books.push(book)
-      person.books.last.name = "gonza"
-      person.save!
-      expect(person.books.last.name).to eq("gonza")
-      expect(person.books.size).to eq(3)
-    end
-    it "Should refresh the last book" do
-      book = fixture.book
-      person.books.push(book)
-      person.save!
-      anotherBook = person.books.last
-      anotherBook.name = "gonza"
-      anotherBook.save!
-      person.refresh!
-      expect(person.books.last.name).to eq("gonza")
-    end
-
-    it "Should all instances bring the complete person" do
-      person.save!
-      expect(Person.all_instances.first.books.first.name).to eq("harry")
-    end
-  end
-
-  describe "Should be correct with inheritance and mixins" do
-    it "Should save animal and bird instances" do
-      person.save!
-      bird.save!
-      expect(Animal.all_instances.size).to eq(2)
-    end
-
-    it "Should bring both animals with name juno" do
-      person.save!
-      bird.save!
-      expect(Animal.find_by_first_name("juno").size).to eq(2)
-    end
-
-    # TESTS NOT WORKING WITH LINEALIZATION
-    it "Should work with mixins linealization" do
-      wallet = Wallet.new
-      wallet.type = "purse"
-      wallet.save!
-      expect(Wallet.all_instances.first.type).to eq("purse")
-    end
-
-    it "Should work with mixins linealization" do
-      expect(Wallet.sticky_fields[:purse]).to eq(String)
-    end
-    # TESTS NOT WORKING WITH LINEALIZATION
-  end
-
-  describe "Should be correct with validations" do
-    it "Should save the validations" do
-      expect{(validation.save!)}.to_not raise_error()
-    end
-
-    it "Should fail the validations" do
-      validation.num = "asd"
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.num = "asd"
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.string = 8
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.bool = "asd"
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.bool = ""
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.num = 80000
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.num = 1
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.animal.first_name = 8
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.books.first.name = 8
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-    it "Should fail the validations" do
-      validation.animal.age = -1
-      expect{(validation.save!)}.to raise_error("Error de tipos")
-    end
-
-  end
-
-  describe "default" do
-    it "Should have default value" do
-      expect(validation.default_string).to eq("String")
-    end
-
-    it "Should have default value" do
-      validation.default_string = nil
-      validation.save!
-      expect(validation.default_string).to eq("String")
-    end
-  end
-
 end
