@@ -175,6 +175,7 @@ class Persona
   has_one Auto, named: :auto
 end
 
+
 pers_a = Persona.new
 pers_b = Persona.new
 pers_a.nombre = "Pedro"
