@@ -35,14 +35,10 @@ module Persistence
     end
 
     def refresh!(instance)
-      if (instance.id)
         savedInstance = table.entries.find{ |i| i[:id] == instance.id }
         sticky_fields.each do
         |name, type| instance.instance_variable_set("@#{name}", savedInstance[name])
         end
-      else
-        raise("Este objeto no tiene id!")
-      end
     end
 
     def to_hash(instance)
@@ -53,16 +49,15 @@ module Persistence
 
     def all_instances
       table = TADB::DB.table(self.name)
-      instances = table.entries.flat_map { |instance|  (create_new_instance instance) }
+      instances = table.entries.map { |instance|  (create_new_instance instance) }
       instances
     end
 
     def create_new_instance (attributes)
       instance = self.new
-      sticky_fields.each do
-      |name, type| initialize_by_type instance, name, type, attributes
+      attributes.each do
+      |name, value| instance.instance_variable_set("@#{name}", value)
       end
-      instance.instance_variable_set("@id", attributes[:id])
       instance
     end
 
@@ -98,11 +93,12 @@ module Persistence
     end
 
     def save!
+      define_singleton_method(:refresh!) {self.class.refresh!(self)}
       self.class.save!(self)
     end
 
     def refresh!
-      self.class.refresh!(self)
+      raise("Este objeto no tiene id!")
     end
 
     def forget!
