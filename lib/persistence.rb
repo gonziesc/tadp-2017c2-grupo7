@@ -29,7 +29,7 @@ module Persistence
 
     def save!(instance)
       complex_sticky_fields.each do |name, _|
-        instance.send(name).save!
+        instance.send(name).save! if instance.send(name)
       end
       instance.id = table.upsert(instance)
     end
@@ -55,7 +55,7 @@ module Persistence
     def to_hash(instance)
       hash = {}
       primitive_sticky_fields.each { |name, _| hash[name] = instance.send(name)}
-      complex_sticky_fields.each { |name, _| hash[name] = instance.send(name).id}
+      complex_sticky_fields.each { |name, _| hash[name] = instance.send(name) ? instance.send(name).id : nil}
       hash
     end
 
@@ -96,7 +96,7 @@ module Persistence
     end
 
     def primitive?(type)
-      (type == String) || (type == Integer) || (type == Boolean)
+      (type == String) || (type == Numeric) || (type == Boolean)
     end
 
     def attribute_exists?(attribute)
@@ -118,8 +118,7 @@ module Persistence
     end
 
     def refresh!
-      # raise("Este objeto no tiene id!")
-      self.class.refresh!(self)
+      raise("Este objeto no tiene id!")
     end
 
     def forget!
@@ -174,16 +173,3 @@ class Persona
   has_one Integer, named: :edad
   has_one Auto, named: :auto
 end
-
-
-pers_a = Persona.new
-pers_b = Persona.new
-pers_a.nombre = "Pedro"
-pers_a.edad = 10
-pers_a.auto = Auto.new
-pers_a.auto.marca = "Audi"
-pers_a.save!
-pers_b.id = pers_a.id
-pers_b.refresh!
-puts pers_b.to_hash
-puts pers_b.auto.marca
