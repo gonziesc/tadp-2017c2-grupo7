@@ -29,7 +29,7 @@ module Persistence
 
     def save!(instance)
       complex_sticky_fields.each do |name, _|
-        instance.send(name).save! if instance.send(name)
+        instance.send(name).save!
       end
       instance.id = table.upsert(instance)
     end

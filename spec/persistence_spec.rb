@@ -112,4 +112,35 @@ describe "persistence" do
       expect{(Person.find_by_asdasd())}.to raise_error("El metodo no existe o tiene parametros")
     end
   end
+
+  describe "having persisting objetcs" do
+    it "Should have persistable attributes" do
+      expect(person.animal.first_name).to eq("juno")
+      expect(person.animal.age).to eq(1)
+    end
+
+    it "Should have id after save" do
+      person.save!
+      expect(person.animal.id).not_to eq(nil)
+    end
+
+    it "Should have name after save" do
+      person.save!
+      expect(person.animal.age).to eq(1)
+    end
+
+    it "Should all instances bring the complete person" do
+      person.save!
+      expect(Person.all_instances.first.animal.age).to eq(1)
+    end
+
+    it "Should change attribute after refreshing" do
+      person.save!
+      animal = person.animal
+      animal.age = 2
+      animal.save!
+      person.refresh!
+      expect(person.animal.age).to eq(2)
+    end
+  end
 end
