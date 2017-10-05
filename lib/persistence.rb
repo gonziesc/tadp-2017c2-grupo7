@@ -162,14 +162,3 @@ module TADB
   end
 end
 
-class Auto
-  include Persistence
-  has_one String, named: :marca
-end
-
-class Persona
-  include Persistence
-  has_one String, named: :nombre
-  has_one Integer, named: :edad
-  has_one Auto, named: :auto
-end
