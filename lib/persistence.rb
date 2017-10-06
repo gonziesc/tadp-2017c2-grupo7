@@ -18,9 +18,31 @@ module Persistence
       @table ||= TADB::DB.table(name)
     end
 
+    def field_exists?(name)
+      return sticky_fields.any? {|field| field.name == name}
+    end
+
+    def change_field_type(name, type)
+      sticky_fields.find{|field| field.name == name}.type = type
+    end
+
+    def has(new_field, type)
+      if(field_exists? new_field.name)
+        change_field_type(new_field.name, type)
+      else
+        attr_accessor(new_field.name)
+        sticky_fields << new_field
+      end
+    end
+
     def has_one (type, named:)
-      primitive?(type) ? sticky_fields << SimpleField.new(type, named) : sticky_fields << ComplexField.new(type, named)
-      attr_accessor(named)
+      new_field = primitive?(type) ? SimpleField.new(type, named) : ComplexField.new(type, named)
+      has(new_field, type)
+    end
+
+    def has_many(type, named:)
+      new_field=  ManyField.new(type, named)
+      has(new_field, type)
     end
 
     def save!(instance)
