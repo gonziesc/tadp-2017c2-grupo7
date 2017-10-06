@@ -143,4 +143,31 @@ describe "persistence" do
       expect(person.animal.age).to eq(2)
     end
   end
+
+  describe "has many" do
+    it "Should have 3 books after adding one" do
+      book = fixture.book
+      person.books.push(book)
+      person.books.last.name = "gonza"
+      person.save!
+      expect(person.books.last.name).to eq("gonza")
+      expect(person.books.size).to eq(3)
+    end
+    it "Should refresh the last book" do
+      book = fixture.book
+      person.books.push(book)
+      person.save!
+      anotherBook = person.books.last
+      anotherBook.name = "gonza"
+      anotherBook.save!
+      person.refresh!
+      expect(person.books.last.name).to eq("gonza")
+    end
+
+    it "Should all instances bring the complete person" do
+      person.save!
+      expect(Person.all_instances.first.books.first.name).to eq("harry")
+    end
+  end
+
 end
