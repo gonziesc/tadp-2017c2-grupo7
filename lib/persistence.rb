@@ -9,29 +9,22 @@ module Persistence
   end
 
   module ClassPersistence
-    attr_accessor :primitive_sticky_fields, :table, :complex_sticky_fields
-    def primitive_sticky_fields
-      @primitive_sticky_fields ||= { id: String }
-    end
-
-    def complex_sticky_fields
-      @complex_sticky_fields ||= {}
+    attr_accessor :sticky_fields, :table
+    def sticky_fields
+      @sticky_fields ||= []
     end
 
     def table
       @table ||= TADB::DB.table(name)
     end
 
-    def has_one (type, hash)
-      primitive?(type) ? primitive_sticky_fields[hash[:named]] = type : complex_sticky_fields[hash[:named]] = type
-      attr_accessor(hash[:named])
+    def has_one (type, named:)
+      primitive?(type) ? sticky_fields << SimpleField.new(type, named) : sticky_fields << ComplexField.new(type, named)
+      attr_accessor(named)
     end
 
     def save!(instance)
-      complex_sticky_fields.each do |name, _|
-        instance.send(name).save!
-      end
-      instance.id = table.upsert(instance)
+      instance.id = table.upsert(instance.to_hash)
     end
 
     def forget!(instance)
@@ -40,36 +33,25 @@ module Persistence
     end
 
     def refresh!(instance)
-      saved_instance_hash = table.entries.find{ |i| i[:id] == instance.id }
-      primitive_sticky_fields.each do |name, _|
-        instance.send("#{name}=", saved_instance_hash[name])
-      end
-      complex_sticky_fields.each do |name, type|
-        sub_instance = type.new
-        sub_instance.id = saved_instance_hash[name]
-        sub_instance.refresh!
-        instance.send("#{name}=", sub_instance)
-      end
+      sticky_fields.each {|field| (field.refresh!(instance)) }
     end
 
     def to_hash(instance)
       hash = {}
-      primitive_sticky_fields.each { |name, _| hash[name] = instance.send(name)}
-      complex_sticky_fields.each { |name, _| hash[name] = instance.send(name) ? instance.send(name).id : nil}
+      sticky_fields.each {|field| hash.merge! (field.save!(instance)) }
       hash
     end
 
     def all_instances
       table = TADB::DB.table(self.name)
-      instances = table.entries.map { |instance| (create_new_instance instance) }
+      instances = table.entries.flat_map { |instance| (create_new_instance instance) }
       instances
     end
 
     def create_new_instance (attributes)
       instance = self.new
-      attributes.each do |name, value|
-        instance.send("#{name}=", value)
-      end
+      sticky_fields.each {|field| field.assign(instance, attributes[field.name])}
+      instance.id = attributes[:id]
       instance
     end
 
@@ -81,6 +63,10 @@ module Persistence
       else
         super(sym, *args, &block)
       end
+    end
+
+    def getFromDB(instance)
+      table.entries.find{ |i| i[:id] == instance.id }
     end
 
     def get_method_name (method)
@@ -97,10 +83,6 @@ module Persistence
 
     def primitive?(type)
       (type == String) || (type == Numeric) || (type == Boolean)
-    end
-
-    def attribute_exists?(attribute)
-      primitive_sticky_fields.keys.any? { |key| key == attribute} || complex_sticky_field.keys.any? {|key| key == attribute}
     end
 
   end
@@ -125,16 +107,12 @@ module Persistence
       self.class.forget!(self)
     end
 
+    def getFromDB
+      self.class.getFromDB(self)
+    end
+
     def to_hash
       self.class.to_hash(self)
-    end
-
-    def primitive_sticky_fields
-      self.class.primitive_sticky_fields
-    end
-
-    def complex_sticky_fields
-      self.class.complex_sticky_fields
     end
 
   end
@@ -147,13 +125,13 @@ module TADB
       if persisted? object
         update object
       else
-        insert(object.to_hash)
+        insert(object)
       end
     end
 
     def update(object)
       delete(object.id)
-      insert(object.to_hash)
+      insert(object)
     end
 
     def persisted?(object)
@@ -162,3 +140,60 @@ module TADB
   end
 end
 
+class SimpleField
+  attr_accessor :type, :name
+  def initialize(type, name)
+    @type = type
+    @name = name
+  end
+
+  def get_field(instance)
+    instance.send("#{@name}")
+  end
+
+  def assign(instance, value)
+    instance.send("#{@name}=", value)
+  end
+
+  def save! (instance)
+    field = get_field(instance)
+    hash = {}
+    hash[name] = field
+    hash
+  end
+
+  def refresh!(instance)
+    actualInstance = instance.getFromDB()
+    instance.send("#{@name}=", actualInstance[name])
+  end
+end
+
+class ComplexField
+  attr_accessor :type, :name
+  def initialize(type, name)
+    @type = type
+    @name = name
+  end
+
+  def get_field(instance)
+    instance.send("#{@name}")
+  end
+
+  def assign(instance, value)
+    instance.send("#{@name}=", type.find_by_id(value).first)
+  end
+
+  def save! (instance)
+    has_object = get_field(instance)
+    id = has_object.save!
+    hash = {}
+    hash[name] = id
+    hash
+  end
+
+  def refresh!(instance)
+    has_object = get_field(instance)
+    has_object.refresh!
+    instance.send("#{@name}=", has_object)
+  end
+end
