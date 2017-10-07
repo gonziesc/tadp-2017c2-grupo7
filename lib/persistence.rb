@@ -194,8 +194,8 @@ class Field
   end
 
   def validate!(instance)
-    validate_type(get_field(instance))
     @validations.each {|name, value| send(name, value, get_field(instance), instance)}
+    validate_type(get_field(instance))
   end
 
   def validate (proc, value, instance)
@@ -213,14 +213,13 @@ class Field
   def set_default(instance)
     if @validations.any? {|name, value| name.to_s == "default"}
       value = @validations[:default]
-      puts value
       instance.send("#{@name}=", value)
     end
   end
 
   def default (validation, value, instance)
     if value == nil
-      instance.send("@#{@name}=", validation)
+      instance.send("#{@name}=", validation)
     end
   end
 
