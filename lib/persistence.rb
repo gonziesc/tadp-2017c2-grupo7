@@ -35,17 +35,22 @@ module Persistence
       end
     end
 
-    def has_one (type, named:)
-      new_field = primitive?(type) ? SimpleField.new(type, named) : ComplexField.new(type, named)
+    def has_one (type, hash)
+      new_field = primitive?(type) ? SimpleField.new(type, hash) : ComplexField.new(type, hash)
       has(new_field, type)
     end
 
-    def has_many(type, named:)
-      new_field=  ManyField.new(type, named)
+    def has_many(type, hash)
+      new_field=  ManyField.new(type, hash)
       has(new_field, type)
+    end
+
+    def validate!(instance)
+      sticky_fields.each {|field| (field.validate!(instance)) }
     end
 
     def save!(instance)
+      validate!(instance)
       instance.id = table.upsert(instance.to_hash)
     end
 
@@ -129,6 +134,10 @@ module Persistence
       self.class.forget!(self)
     end
 
+    def validate!
+      self.class.validate!(self)
+    end
+
     def getFromDB
       self.class.getFromDB(self)
     end
@@ -162,16 +171,63 @@ module TADB
   end
 end
 
-class SimpleField
-  attr_accessor :type, :name
-  def initialize(type, name)
+class Field
+  attr_accessor :type, :name, :validations
+  def initialize(type, hash)
     @type = type
-    @name = name
+    @name = hash[:named]
+    @validations = hash.reject!{ |k| k == :named }
   end
 
   def get_field(instance)
     instance.send("#{@name}")
   end
+
+  def validate!(instance)
+    validate_type(get_field(instance))
+    @validations.each {|name, value| send(name, value, get_field(instance))}
+  end
+
+  def validate (proc, value)
+    unless value.instance_eval(&proc)
+      raise("Error de tipos")
+    end
+  end
+
+  def validate_type(value)
+    unless value.is_a? type
+      raise("Error de tipos")
+    end
+  end
+
+end
+
+class SimpleField < Field
+
+  def no_blank (validation, value)
+    if value.is_a? Boolean and validation == true
+      if value == nil or value == ""
+        raise("Error de tipos")
+      end
+    end
+  end
+
+  def from (validation, value)
+    if value.is_a? Numeric
+      if value < validation
+        raise("Error de tipos")
+      end
+    end
+  end
+
+  def to (validation, value)
+    if value.is_a? Numeric
+      if value > validation
+        raise("Error de tipos")
+      end
+    end
+  end
+
 
   def assign(instance, value)
     instance.send("#{@name}=", value)
@@ -191,16 +247,7 @@ class SimpleField
 
 end
 
-class ComplexField
-  attr_accessor :type, :name
-  def initialize(type, name)
-    @type = type
-    @name = name
-  end
-
-  def get_field(instance)
-    instance.send("#{@name}")
-  end
+class ComplexField < Field
 
   def assign(instance, value)
     instance.send("#{@name}=", type.find_by_id(value).first)
@@ -219,19 +266,15 @@ class ComplexField
     has_object.refresh!
     instance.send("#{@name}=", has_object)
   end
-  
+
+  def validate_type(value)
+    super(value)
+    value.validate!
+  end
+
 end
 
-class ManyField
-  attr_accessor :type, :name, :ids, :table
-  def initialize(type, name)
-    @type = type
-    @name = name
-  end
-
-  def get_field(instance)
-    instance.send("#{@name}")
-  end
+class ManyField < Field
 
   def assign(instance, value)
     instances = @ids.map {|id| type.find_by_id(id).first }
@@ -253,5 +296,12 @@ class ManyField
     has_object = get_field(instance)
     has_object.each {|object| object.refresh!}
     instance.send("#{@name}=", has_object)
+  end
+
+  def validate_type(array)
+    unless array.all? {|object| object.is_a? type}
+      raise("Error de tipos")
+    end
+    array.each{|object| object.validate!}
   end
 end
