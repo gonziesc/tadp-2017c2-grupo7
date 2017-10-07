@@ -228,4 +228,16 @@ describe "persistence" do
 
   end
 
+  describe "default" do
+    it "Should have default value" do
+      expect(validation.default_string).to eq("asd")
+    end
+
+    it "Should have default value" do
+      validation.default_string = nil
+      validation.save!
+      expect(validation.default_string).to eq("asd")
+    end
+  end
+
 end

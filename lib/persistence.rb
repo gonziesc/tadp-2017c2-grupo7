@@ -14,6 +14,16 @@ module Persistence
       @sticky_fields ||= []
     end
 
+    def new
+      instance = super
+      set_default_for_instance instance
+      instance
+    end
+
+    def set_default_for_instance (instance)
+      @sticky_fields.each {|field| field.set_default(instance)}
+    end
+
     def table
       @table ||= TADB::DB.table(name)
     end
@@ -185,10 +195,10 @@ class Field
 
   def validate!(instance)
     validate_type(get_field(instance))
-    @validations.each {|name, value| send(name, value, get_field(instance))}
+    @validations.each {|name, value| send(name, value, get_field(instance), instance)}
   end
 
-  def validate (proc, value)
+  def validate (proc, value, instance)
     unless value.instance_eval(&proc)
       raise("Error de tipos")
     end
@@ -200,11 +210,25 @@ class Field
     end
   end
 
+  def set_default(instance)
+    if @validations.any? {|name, value| name.to_s == "default"}
+      value = @validations[:default]
+      puts value
+      instance.send("#{@name}=", value)
+    end
+  end
+
+  def default (validation, value, instance)
+    if value == nil
+      instance.send("@#{@name}=", validation)
+    end
+  end
+
 end
 
 class SimpleField < Field
 
-  def no_blank (validation, value)
+  def no_blank (validation, value, instance)
     if value.is_a? Boolean and validation == true
       if value == nil or value == ""
         raise("Error de tipos")
@@ -212,7 +236,7 @@ class SimpleField < Field
     end
   end
 
-  def from (validation, value)
+  def from (validation, value, instance)
     if value.is_a? Numeric
       if value < validation
         raise("Error de tipos")
@@ -220,7 +244,7 @@ class SimpleField < Field
     end
   end
 
-  def to (validation, value)
+  def to (validation, value, instance)
     if value.is_a? Numeric
       if value > validation
         raise("Error de tipos")
