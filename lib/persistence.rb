@@ -92,7 +92,7 @@ module Persistence
 
     def all_instances
       instances = table.entries.map {|row| create_new_instance(row)}
-      descendants.each{|descendant| instances.concat(descendant.all_instances)}
+      # descendants.each{|descendant| instances.concat(descendant.all_instances)}
       instances
     end
 
@@ -271,19 +271,21 @@ class SimpleField < Field
 
 
   def assign(instance, value)
-    instance.send("#{@name}=", value)
+    instance.tap do |this|
+      this.send("#{name}=", value)
+    end
   end
 
   def save! (instance)
-    field = field(instance)
-    hash = {}
-    hash[name] = field
-    hash
+    {name => field(instance)}
   end
 
   def refresh!(instance)
-    actualInstance = instance.getFromDB()
-    instance.send("#{@name}=", actualInstance[name])
+    instance.send("#{name}=", saved_value(instance))
+  end
+
+  def saved_value(instance)
+    instance.class.find_by_id(instance.id).first.send(name)
   end
 
 end
