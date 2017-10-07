@@ -3,13 +3,13 @@ require_relative './boolean.rb'
 
 module Persistence
 
-  def self.included (base)
+  def self.included(base)
     base.extend ClassPersistence
     base.include InstancePersistence
   end
 
   module ClassPersistence
-    attr_accessor :sticky_fields, :table
+    attr_accessor :sticky_fields
     def sticky_fields
       @sticky_fields ||= []
     end
@@ -83,18 +83,15 @@ module Persistence
     end
 
     def refresh!(instance)
-      sticky_fields.each {|field| (field.refresh!(instance)) }
+      sticky_fields.each {|field| field.refresh!(instance)}
     end
 
     def to_hash(instance)
-      hash = {}
-      sticky_fields.each {|field| hash.merge! (field.save!(instance)) }
-      hash
+      sticky_fields.inject({}) {|hash, field| hash.merge(field.save!(instance))}
     end
 
     def all_instances
-      table = TADB::DB.table(self.name)
-      instances = table.entries.flat_map { |instance| (create_new_instance instance) }
+      instances = table.entries.map {|row| create_new_instance(row)}
       descendants.each{|descendant| instances.concat(descendant.all_instances)}
       instances
     end
@@ -112,32 +109,35 @@ module Persistence
 
     def method_missing(sym, *args, &block)
       method = sym.to_s
-      if method.start_with? 'find_by'
-        instance_method = get_method_name method
-        find_by instance_method, args[0]
+      if query_method?(method)
+        find_by(queryable_attribute(method), args.first)
       else
         super(sym, *args, &block)
       end
+    end
+
+    def query_method?(name)
+      name.start_with?('find_by_')
     end
 
     def getFromDB(instance)
       table.entries.find{ |i| i[:id] == instance.id }
     end
 
-    def get_method_name (method)
+    def queryable_attribute(method)
       method[8..-1]
     end
 
-    def find_by (instance_method, arg)
-      if self.method_defined? instance_method and self.instance_method(instance_method).arity == 0
-        self.all_instances.select {|instance| instance.send(instance_method) == arg}
+    def find_by(attribute_name, expected_value)
+      if self.method_defined? attribute_name and self.attribute_name(instance_method).arity == 0
+        all_instances.select {|instance| instance.send(attribute_name) == expected_value}
       else
         raise("El metodo no existe o tiene parametros")
       end
     end
 
     def primitive?(type)
-      (type == String) || (type == Numeric) || (type == Boolean)
+      type.equal?(String) || type.equal?(Numeric) || type.equal?(Boolean)
     end
 
   end
@@ -155,7 +155,7 @@ module Persistence
     end
 
     def refresh!
-      raise("Este objeto no tiene id!")
+      raise 'Este objeto no tiene id!'
     end
 
     def forget!
