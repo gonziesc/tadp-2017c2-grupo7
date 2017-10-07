@@ -293,21 +293,21 @@ end
 class ComplexField < Field
 
   def assign(instance, value)
-    instance.send("#{@name}=", type.find_by_id(value).first)
+    instance.tap do |this|
+      this.send("#{name}=", type.find_by_id(value).first)
+    end
   end
 
   def save! (instance)
     has_object = field(instance)
     id = has_object.save!
-    hash = {}
-    hash[name] = id
-    hash
+    {name => id}
   end
 
   def refresh!(instance)
     has_object = field(instance)
     has_object.refresh!
-    instance.send("#{@name}=", has_object)
+    instance.send("#{name}=", has_object)
   end
 
   def validate_type(value)
