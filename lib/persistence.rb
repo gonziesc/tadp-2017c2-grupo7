@@ -14,6 +14,19 @@ module Persistence
       @sticky_fields ||= []
     end
 
+    def superclass_is_sticky?
+      self.respond_to? "superclass" and self.superclass.instance_variable_get(:@sticky_fields)
+    end
+
+    def superclass_sticky_fields
+      superclass.respond_to?("sticky_fields") ? superclass.sticky_fields : []
+    end
+
+    def module_sticky_fields
+      mods = included_modules.select{|mod| mod.respond_to?("sticky_fields")}
+      mods.collect{|mod| mod.sticky_fields}
+    end
+
     def new
       instance = super
       set_default_for_instance instance
@@ -82,7 +95,12 @@ module Persistence
     def all_instances
       table = TADB::DB.table(self.name)
       instances = table.entries.flat_map { |instance| (create_new_instance instance) }
+      descendants.each{|descendant| instances.concat(descendant.all_instances)}
       instances
+    end
+
+    def descendants
+      ObjectSpace.each_object(Class).select{|klass| klass < self}
     end
 
     def create_new_instance (attributes)
