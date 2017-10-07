@@ -129,7 +129,7 @@ module Persistence
     end
 
     def find_by(attribute_name, expected_value)
-      if self.method_defined? attribute_name and self.attribute_name(instance_method).arity == 0
+      if self.method_defined? attribute_name and self.instance_method(attribute_name).arity == 0
         all_instances.select {|instance| instance.send(attribute_name) == expected_value}
       else
         raise("El metodo no existe o tiene parametros")
@@ -194,7 +194,7 @@ module TADB
     end
 
     def persisted?(object)
-      entries.any? { |(key, value)| key == "id" && value == object.id }
+      entries.any? {|(key, value)| key == 'id' && value == object.id}
     end
   end
 end
@@ -207,13 +207,13 @@ class Field
     @validations = hash.reject!{ |k| k == :named }
   end
 
-  def get_field(instance)
-    instance.send("#{@name}")
+  def field(instance)
+    instance.send(name)
   end
 
   def validate!(instance)
-    @validations.each {|name, value| send(name, value, get_field(instance), instance)}
-    validate_type(get_field(instance))
+    @validations.each {|name, value| send(name, value, field(instance), instance)}
+    validate_type(field(instance))
   end
 
   def validate (proc, value, instance)
@@ -275,7 +275,7 @@ class SimpleField < Field
   end
 
   def save! (instance)
-    field = get_field(instance)
+    field = field(instance)
     hash = {}
     hash[name] = field
     hash
@@ -295,7 +295,7 @@ class ComplexField < Field
   end
 
   def save! (instance)
-    has_object = get_field(instance)
+    has_object = field(instance)
     id = has_object.save!
     hash = {}
     hash[name] = id
@@ -303,7 +303,7 @@ class ComplexField < Field
   end
 
   def refresh!(instance)
-    has_object = get_field(instance)
+    has_object = field(instance)
     has_object.refresh!
     instance.send("#{@name}=", has_object)
   end
@@ -323,7 +323,7 @@ class ManyField < Field
   end
 
   def save! (instance)
-    has_object = get_field(instance)
+    has_object = field(instance)
     @ids = has_object.map {|object| object.save!}
     table_name = instance.class.name + "_" + @name.to_s
     @table = TADB::DB.table(table_name)
@@ -334,7 +334,7 @@ class ManyField < Field
   end
 
   def refresh!(instance)
-    has_object = get_field(instance)
+    has_object = field(instance)
     has_object.each {|object| object.refresh!}
     instance.send("#{@name}=", has_object)
   end
