@@ -49,10 +49,6 @@ module Persistence
       instance.id = table.upsert(instance.to_hash)
     end
 
-    def insert_many_fields(instance)
-      sticky_fields.each {|field| field.insert_many_table(instance) }
-    end
-
     def forget!(instance)
       table.delete(instance.id)
       instance.id = nil
@@ -118,11 +114,6 @@ module Persistence
 
     def initialize
       @id = nil
-    end
-
-    def id=(value)
-      @id = value
-      self.class.insert_many_fields(self)
     end
 
     def save!
@@ -198,9 +189,6 @@ class SimpleField
     instance.send("#{@name}=", actualInstance[name])
   end
 
-  def insert_many_table(instance)
-
-  end
 end
 
 class ComplexField
@@ -231,10 +219,7 @@ class ComplexField
     has_object.refresh!
     instance.send("#{@name}=", has_object)
   end
-
-  def insert_many_table(instance)
-
-  end
+  
 end
 
 class ManyField
@@ -249,13 +234,8 @@ class ManyField
   end
 
   def assign(instance, value)
-    has_many_instances = table.entries().select {|entry| entry[:self_id] == instance.id}
-    has_many_instances.map {|instance| type.find_by_id(instance[:foreign_key]).first }
-    instance.send("#{@name}=", has_many_instances)
-  end
-
-  def key_for_many (id, selfId)
-    {"foreign_key" => id, "self_id" => selfId}
+    instances = @ids.map {|id| type.find_by_id(id).first }
+    instance.send("#{@name}=", instances)
   end
 
   def save! (instance)
@@ -263,15 +243,10 @@ class ManyField
     @ids = has_object.map {|object| object.save!}
     table_name = instance.class.name + "_" + @name.to_s
     @table = TADB::DB.table(table_name)
-    insert_many_table instance
+    @ids.each {|id| @table.insert( {"foreign_key" => id})}
     hash = {}
     hash[name] = table_name
     hash
-  end
-
-  def insert_many_table(instance)
-    puts instance.id
-    @ids.each {|id| @table.insert(key_for_many id, instance.id.to_s)}
   end
 
   def refresh!(instance)
