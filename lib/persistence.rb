@@ -15,16 +15,18 @@ module Persistence
     end
 
     def superclass_is_sticky?
-      self.respond_to? "superclass" and self.superclass.instance_variable_get(:@sticky_fields)
+      self.respond_to? "superclass" and superclass.respond_to?("sticky_fields")
     end
 
-    def superclass_sticky_fields
-      superclass.respond_to?("sticky_fields") ? superclass.sticky_fields : []
+    def set_superclass_sticky_fields
+      if superclass_is_sticky?
+        sticky_fields.concat(superclass.sticky_fields)
+      end
     end
 
-    def module_sticky_fields
+    def set_module_sticky_fields
       mods = included_modules.select{|mod| mod.respond_to?("sticky_fields")}
-      mods.collect{|mod| mod.sticky_fields}
+      sticky_fields.concat(mods.collect{|mod| mod.sticky_fields})
     end
 
     def new
@@ -34,7 +36,7 @@ module Persistence
     end
 
     def set_default_for_instance (instance)
-      @sticky_fields.each {|field| field.set_default(instance)}
+      sticky_fields.each {|field| field.set_default(instance)}
     end
 
     def table
@@ -50,6 +52,8 @@ module Persistence
     end
 
     def has(new_field, type)
+      set_superclass_sticky_fields
+      set_module_sticky_fields
       if(field_exists? new_field.name)
         change_field_type(new_field.name, type)
       else
@@ -92,7 +96,7 @@ module Persistence
 
     def all_instances
       instances = table.entries.map {|row| create_new_instance(row)}
-      # descendants.each{|descendant| instances.concat(descendant.all_instances)}
+      descendants.each { |descendant| instances.concat(descendant.all_instances) }
       instances
     end
 
@@ -187,6 +191,11 @@ module TADB
         insert(object)
       end
     end
+
+    def db_path
+      "./db/#{@name}.json"
+    end
+
 
     def update(object)
       delete(object.id)

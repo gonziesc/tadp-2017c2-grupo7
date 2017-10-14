@@ -1,47 +1,55 @@
 require 'rspec'
 require_relative("fixture.rb")
 
+require 'rspec'
+require_relative("fixture.rb")
+
 describe "persistence" do
   fixture = Fixture.new
   let!(:person) {fixture.person}
+  let!(:bird) {fixture.bird}
   let!(:validation) {fixture.validation}
 
-    after(:each) do
-      if File.exist? "./db/Person"
-       File.delete("./db/Person")
-      end
-      if File.exist? "./db/Animal"
-        File.delete("./db/Animal")
-      end
-      if File.exist? "./db/Book"
-        File.delete("./db/Book")
-      end
-      if File.exist? "./db/Person_books"
-        File.delete("./db/Person_books")
-      end
-      if File.exist? "./db/Bird"
-        File.delete("./db/Bird")
-      end
-      if File.exist? "./db/Validations"
-        File.delete("./db/Validations")
-      end
-      if File.exist? "./db/Validations_books"
-        File.delete("./db/Validations_books")
-      end
-      if File.exist? "./db/Wallet"
-        File.delete("./db/Wallet")
-      end
+  after(:each) do
+    if File.exist? "./db/Person.json"
+      File.delete("./db/Person.json")
     end
+    if File.exist? "./db/Animal.json"
+      File.delete("./db/Animal.json")
+    end
+    if File.exist? "./db/Book.json"
+      File.delete("./db/Book.json")
+    end
+    if File.exist? "./db/Person_books.json"
+      File.delete("./db/Person_books.json")
+    end
+    if File.exist? "./db/Bird.json"
+      File.delete("./db/Bird.json")
+    end
+    if File.exist? "./db/Validations.json"
+      File.delete("./db/Validations.json")
+    end
+    if File.exist? "./db/Validations_books.json"
+      File.delete("./db/Validations_books.json")
+    end
+    if File.exist? "./db/Wallet.json"
+      File.delete("./db/Wallet.json")
+    end
+  end
 
-    it "Should have persistable attributes" do
-      expect(person).to respond_to(:first_name)
-      expect(person).to respond_to(:last_name)
-      expect(person).to respond_to(:age)
-    end
+  it "Should have replaced dummy attribute type" do
+    expect(Dummy.sticky_fields.first.type).to eq(String)
+  end
 
-    it "Should not have other attributes" do
-      expect(person).not_to respond_to(:saraza)
-    end
+  it "Should have persistable attributes" do
+    expect(person).to respond_to(:first_name)
+    expect(person).to respond_to(:last_name)
+    expect(person).to respond_to(:age)
+  end
+
+  it "Should not have other attributes" do
+    expect(person).not_to respond_to(:saraza)
+  end
 
   it "Should have persistable attributes" do
     expect(person.first_name).to eq("gonza")
@@ -62,8 +70,8 @@ describe "persistence" do
 
   it "Should raise exception because of no saving" do
     person.first_name = "asd"
-    expect{person.refresh!}.to raise_error("Este objeto no tiene id!")
-   end
+    expect{(person.refresh!)}.to raise_error("Este objeto no tiene id!")
+  end
 
   it "Should forget id after forgetting" do
     person.save!
@@ -171,6 +179,33 @@ describe "persistence" do
     end
   end
 
+  describe "Should be correct with inheritance and mixins" do
+    it "Should save animal and bird instances" do
+      person.save!
+      bird.save!
+      expect(Animal.all_instances.size).to eq(2)
+    end
+
+    it "Should bring both animals with name juno" do
+      person.save!
+      bird.save!
+      expect(Animal.find_by_first_name("juno").size).to eq(2)
+    end
+
+    # TESTS NOT WORKING WITH LINEALIZATION
+    it "Should work with mixins linealization" do
+      wallet = Wallet.new
+      wallet.type = "purse"
+      wallet.save!
+      expect(Wallet.all_instances.first.type).to eq("purse")
+    end
+
+    it "Should work with mixins linealization" do
+      expect(Wallet.sticky_fields.first.type).to eq(String)
+    end
+    # TESTS NOT WORKING WITH LINEALIZATION
+  end
+
   describe "Should be correct with validations" do
     it "Should save the validations" do
       expect{(validation.save!)}.to_not raise_error()
@@ -230,13 +265,13 @@ describe "persistence" do
 
   describe "default" do
     it "Should have default value" do
-      expect(validation.default_string).to eq("asd")
+      expect(validation.default_string).to eq("String")
     end
 
     it "Should have default value" do
       validation.default_string = nil
       validation.save!
-      expect(validation.default_string).to eq("asd")
+      expect(validation.default_string).to eq("String")
     end
   end
 
