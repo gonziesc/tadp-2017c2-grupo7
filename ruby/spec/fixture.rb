@@ -1,4 +1,4 @@
-require_relative("../lib/persistence")
+require_relative("../lib/persistence.rb")
 
 class Fixture
   def person

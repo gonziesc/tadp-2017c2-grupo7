@@ -1,9 +1,6 @@
 require 'rspec'
 require_relative("fixture.rb")
 
-require 'rspec'
-require_relative("fixture.rb")
-
 describe "persistence" do
   fixture = Fixture.new
   let!(:person) {fixture.person}
@@ -194,6 +191,7 @@ describe "persistence" do
 
     # TESTS NOT WORKING WITH LINEALIZATION
     it "Should work with mixins linealization" do
+      Wallet.set_module_sticky_fields
       wallet = Wallet.new
       wallet.type = "purse"
       wallet.save!
@@ -201,9 +199,9 @@ describe "persistence" do
     end
 
     it "Should work with mixins linealization" do
+      Wallet.set_module_sticky_fields
       expect(Wallet.sticky_fields.first.type).to eq(String)
     end
-    # TESTS NOT WORKING WITH LINEALIZATION
   end
 
   describe "Should be correct with validations" do
