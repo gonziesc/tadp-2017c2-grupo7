@@ -12,7 +12,20 @@ object tp {
 		fuerza: Double,
 		velocidad: Double,
 		inteligencia: Double
-	)  
+	)
+	
+	trait InventarioManos extends Item
+  case class UnaMano(manoIzquierda: Option[ItemUnaMano], manoDerecha: Option[ItemUnaMano]) extends InventarioDosManos
+  case class DosManos(dosManos: Option[ItemDosMano]) extends InventarioDosManos
+	
+  case class Inventario(
+      manos: InventarioManos,
+      cabeza: Option[ItemCabeza],
+      torso: Option[ItemTorso],
+      talismanes: List[Talisman]
+      ) {
+    def items() = cabeza.toList ++ torso.toList ++ talismanes ++ manos.items()
+  }
 
   case class Heroe(stats: Stats, trabajo: Option[Trabajo], 
                    items: List[Item] = List()){
@@ -20,7 +33,7 @@ object tp {
       if(unItem.puedeEquipar(this)) {
         unItem match {
           // se puede abstraer esto?
-          case Item(Mano, Some(Mano), _) => this.desequiparParte(Mano)
+          case Mano(Mano, Some(Mano), _) => this.desequiparParte(Mano)
           case Item(Mano, _, _) => this.revisarManos()
           case Item(_, None, _) => this.desequiparParte(unItem.parteDelCuerpo)
         }
@@ -66,17 +79,15 @@ object tp {
       case otro => 0
       }
     def modificarPorItems(): ResultadoDeModificar = {
-      var statsAModificar =
-      trabajo match {
-        case Some(trabajo) => trabajo.modificarStats(stats)
-        case None => stats
+      items.foldLeft(
+          Seguir(trabajo.fold(stats) {_.modificarStats(stats)}
+          ): ResultadoDeModificar){
         
-      }
-      items.foldLeft(Seguir(statsAModificar): ResultadoDeModificar){
+        //(statsAnteriores, itemActual) => statsAnteriores.flatMap(itemActual.efecto(_))
         (statsAnteriores, itemActual) =>
         itemActual match {
           case `talismanMaldito` => 
-		        EstaMaldito(new Stats(1, 1, 1, 1))
+		        Parar(new Stats(1, 1, 1, 1))
 		      case `cascoVikingo` => 
 		        statsAnteriores match { 
 		          case Seguir(_) => Seguir(stats.copy(hp = hp + 10))
@@ -138,12 +149,16 @@ object tp {
       }
     }
   }
+  trait Stat extends Function1[Stats, Double]
+  object Fuerza extends Stat {
+    def apply(s: Stats) = s.fuerza
+  }
     
   trait ResultadoDeModificar{
     def stats: Stats
   }
 	case class Seguir(stats: Stats) extends ResultadoDeModificar
-	case class EstaMaldito(stats: Stats) extends ResultadoDeModificar
+	case class Parar(stats: Stats) extends ResultadoDeModificar
   
   //▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 	// TRABAJOS
@@ -201,7 +216,8 @@ object tp {
   object Espalda extends ParteDelCuerpo
   
   case class Item(parteDelCuerpo: ParteDelCuerpo, 
-     otraParteDelCuerpo: Option[ParteDelCuerpo] = None, valor: Int = 0){
+     otraParteDelCuerpo: Option[ParteDelCuerpo] = None, valor: Int = 0, efecto: 
+       Stats => ResultadoDeModificar = ???){
    def puedeEquipar(heroe: Heroe) = true
   }
   
@@ -268,7 +284,7 @@ object tp {
         heroes ++ Some(heroe).toList, pozo, nombre)
     def reemplazarMiembro(heroe: Heroe, reemplazo: Heroe) = 
       this.copy(heroes.filter(
-          unHeroe => unHeroe != reemplazo) ++ Some(heroe).toList, pozo, nombre)
+          unHeroe => unHeroe != reemplazo) :+ heroe, pozo, nombre)
   }
   
   //▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
@@ -279,7 +295,7 @@ object tp {
   // y la accion de realizarla, me parece demasiada logica como para usar pattern
   trait Tarea{
     def realizarTarea(heroe: Heroe): Heroe = ???
-    def facilidad(heroe: Heroe, equipo: Equipo): Option[Double] = ???
+    def facilidad(equipo: Equipo): PartialFunction[Heroe, (Heroe, Double)] = ???
   }
   case class pelearConMonstruo(danio: Int) extends Tarea{
     override def realizarTarea(heroe: Heroe): Heroe = 
@@ -290,13 +306,12 @@ object tp {
       if (equipo.esLiderDeTipo(Guerrero)) Some(20) else Some(10)
   }
   case class forzarPuerta() extends Tarea {
-     override def realizarTarea(heroe: Heroe) = heroe.trabajo match {
-       case Some(Mago) => heroe
-       case Some(Ladron) => heroe
-       case Some(_) => heroe.copy(heroe.stats.copy(heroe.hpBase - 5,
+     override def realizarTarea(heroe: Heroe) = heroe.trabajo.fold(heroe)( _ match {
+       case Mago => heroe
+       case Ladron => heroe
+       case _ => heroe.copy(heroe.stats.copy(heroe.hpBase - 5,
            heroe.fuerzaBase +1))
-       case otro => heroe
-     }
+     })
   
      override def facilidad(heroe: Heroe, equipo: Equipo): Option[Double] =
        Some(heroe.inteligencia + equipo.cantidadDeLadrones())
@@ -322,21 +337,28 @@ object tp {
 	    tareaFallida: Tarea)extends ResultadoDeTarea
 	
   type Recompensa = Equipo => Equipo
+  
+  def aplicarTarea(tareaActual: Tarea, equipo:Equipo) =  
+//    fequipo.heroes.map((heroe) => (heroe, tareaActual.facilidad(heroe, equipo))).
+//      filter(_._2.isDefined).sortBy(_.2.).headOption.getOrElse(NoPuedeSeguirEnLaMision(equipo, tareaActual))
+    equipo.heroes.collect(tareaActual.facilidad(equipo)).sortBy(_._2).headOption
+//            case Some(heroe) =>
+//              ContinuaMision(equipo.copy(
+//                  equipo.heroes.map(h =>
+//                    if(h==heroe) tareaActual.realizarTarea(heroe)
+//                    else heroe), equipo.pozo, equipo.nombre))
+//            case otro => NoPuedeSeguirEnLaMision(equipo, tareaActual)
+  
   trait mision{
     def tareas: List[Tarea]
     def recompensar: Recompensa = ???
     def ejecutar(equipo: Equipo) : ResultadoDeTarea = {
       tareas.foldLeft(ContinuaMision(equipo): ResultadoDeTarea){
         (equipoAnterior, tareaActual) => 
+          equipoAnteriro.flatMap(tareaActual
         equipoAnterior match {
           case ContinuaMision(equipo) =>
-            Try(equipo.heroes.maxBy(heroe => tareaActual.facilidad(heroe, equipo))).toOption match {
-            case Some(heroe) =>
-              ContinuaMision(equipo.copy(
-                  equipo.heroes.map(h =>
-                    if(h==heroe) tareaActual.realizarTarea(heroe)
-                    else heroe), equipo.pozo, equipo.nombre))
-            case otro => NoPuedeSeguirEnLaMision(equipo, tareaActual)
+           
           }
           case otro => otro
         }
