@@ -61,7 +61,7 @@ object tp {
       case Some(trabajo) => Some(trabajo.incremento(this))
       case otro => None
     }
-    def statPrincipal = trabajo match {
+    def statPrincipal: Double = trabajo match {
       case Some(trabajo) => trabajo.statPrincipal(this)
       case otro => 0
       }
