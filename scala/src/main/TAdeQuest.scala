@@ -1,18 +1,22 @@
 import java.lang.reflect.Constructor
-
+import scala.util.Try
 
 object tp {
   case class Heroe(stats: Stats, trabajo: Option[Trabajo], items: List[Item] = List()){
     
-    def equiparItem(unItem: Item){
+    def equiparItem(unItem: Item):Heroe = {
       if(unItem.puedeEquipar(this)) {
         unItem match {
           // se puede abstraer esto?
-          case Item(Mano, Some(Mano)) => this.desequiparParte(Mano)
-          case Item(Mano, _) => this.revisarManos()
-          case Item(_, None) => this.desequiparParte(unItem.parteDelCuerpo)
+          case Item(Mano, Some(Mano), _) => this.desequiparParte(Mano)
+          case Item(Mano, _, _) => this.revisarManos()
+          case Item(_, None, _) => this.desequiparParte(unItem.parteDelCuerpo)
         }
+        this.copy(stats, trabajo, items ++ Some(unItem).toList)
+      } else {
+        this
       }
+      
     }
     def cambiarTrabajo(nuevoTrabajo: Option[Trabajo]) {
       var nuevoHeroe = this.copy(stats, nuevoTrabajo, items)
@@ -31,13 +35,22 @@ object tp {
     }
     def tieneItemQueOcupaDosManos = items.contains((item: Item) => item.parteDelCuerpo == Mano && item.otraParteDelCuerpo == Some(Mano))
     def tieneAmbasManosOcupadas = items.count(item => item.parteDelCuerpo == Mano) > 1
-    def desequiparParte(parte: ParteDelCuerpo) = items.dropWhile(item => item.parteDelCuerpo == parte)
+    def desequiparParte(parte: ParteDelCuerpo) = items.filter(item => item.parteDelCuerpo != parte)
     def fuerzaBase = stats.fuerza
     def inteligenciaBase = stats.inteligencia
+    def hpBase = stats.hp
     def fuerza = modificarPorItems.stats.fuerza
     def inteligencia = modificarPorItems.stats.inteligencia
     def velocidad = modificarPorItems.stats.velocidad
     def hp = modificarPorItems.stats.hp
+    def incremento: Option[Double] = trabajo match {
+      case Some(trabajo) => Some(trabajo.incremento(this))
+      case otro => None
+    }
+    def statPrincipal = trabajo match {
+      case Some(trabajo) => trabajo.statPrincipal(this)
+      case otro => 0
+      }
     def modificarPorItems(): ResultadoDeModificar = {
       var statsAModificar =
       trabajo match {
@@ -84,7 +97,7 @@ object tp {
 		          case Seguir(_) => {
 		            trabajo match{
 		              case None => Seguir(stats)
-		              case Some(trabajo) => Seguir(trabajo.aumentarStatsNoPrincipales(stats))
+		              case Some(trabajo) => Seguir(trabajo.aumentarStatsNoPrincipales(this))
 		            }
 		          }
 		          case otro => otro
@@ -113,35 +126,40 @@ object tp {
   
   case class Trabajo(stats: Stats){
 	  def modificarStats(unasStats: Stats): Stats = {
-	    // no me deja hacer copy
-	    return new Stats(stats.hp + unasStats.hp, 
+	    stats.copy(stats.hp + unasStats.hp, 
 	        stats.fuerza  + unasStats.fuerza, 
 	        stats.velocidad  + unasStats.velocidad,
 	        stats.inteligencia  + unasStats.inteligencia)
 	  } 
-	   def aumentarStatsNoPrincipales(stats: Stats): Stats = ???
+	   def aumentarStatsNoPrincipales(heroe: Heroe): Stats = ???
+	   def statPrincipal(heroe: Heroe): Double = ???
+	   def incremento(heroe: Heroe): Double = statPrincipal(heroe) * 0.1
 	}
   
   object Guerrero extends Trabajo(new Stats(10, 15, -10, 0)){
-    override def aumentarStatsNoPrincipales(stats: Stats): Stats = {
-      var aumento = stats.fuerza * 0.1
-      // no me deja hacer copy
-      return new Stats(stats.hp + aumento,stats.fuerza, stats.velocidad + aumento, stats.inteligencia + aumento)
+    override def statPrincipal(heroe: Heroe) = heroe.fuerza
+    override def aumentarStatsNoPrincipales(heroe: Heroe): Stats = {
+      var stats = heroe.stats
+      var aumento = incremento(heroe)
+       stats.copy(stats.hp + aumento,stats.fuerza, stats.velocidad + aumento, stats.inteligencia + aumento)
     }
   }
   object Mago extends Trabajo(new Stats(0, -20, 0, 20)){
-    override def aumentarStatsNoPrincipales(stats: Stats): Stats = {
-      var aumento = stats.inteligencia * 0.1
-       return new Stats(stats.hp + aumento,stats.fuerza + aumento, stats.velocidad + aumento, stats.inteligencia)
+    override def statPrincipal(heroe: Heroe) = heroe.inteligencia
+    override def aumentarStatsNoPrincipales(heroe: Heroe): Stats = {
+       var stats = heroe.stats
+       var aumento = incremento(heroe)
+       stats.copy(stats.hp + aumento,stats.fuerza + aumento, stats.velocidad + aumento, stats.inteligencia)
     }
   }
   object Ladron extends Trabajo(new Stats(-5, 0, 10, 0)){
-    override def aumentarStatsNoPrincipales(stats: Stats): Stats = {
-      var aumento = stats.velocidad * 0.1
-      return new Stats(stats.hp + aumento,stats.fuerza  + aumento, stats.velocidad, stats.inteligencia + aumento)
+    override def statPrincipal(heroe: Heroe) = heroe.velocidad
+    override def aumentarStatsNoPrincipales(heroe: Heroe): Stats = {
+      var stats = heroe.stats
+      var aumento = incremento(heroe)
+      stats.copy(stats.hp + aumento,stats.fuerza  + aumento, stats.velocidad, stats.inteligencia + aumento)
     }
   }
-  
   
   trait ParteDelCuerpo
   object Cabeza extends ParteDelCuerpo
@@ -150,7 +168,7 @@ object tp {
   object Talisman extends ParteDelCuerpo
   object Espalda extends ParteDelCuerpo
   
-  case class Item(parteDelCuerpo: ParteDelCuerpo, otraParteDelCuerpo: Option[ParteDelCuerpo] = None){
+  case class Item(parteDelCuerpo: ParteDelCuerpo, otraParteDelCuerpo: Option[ParteDelCuerpo] = None, valor: Int = 0){
    def puedeEquipar(heroe: Heroe) = true
   }
   
@@ -182,12 +200,95 @@ object tp {
     override def puedeEquipar(heroe: Heroe) = heroe.trabajo != Some(Ladron) && heroe.fuerzaBase > 20 
   }
   
-  
+  type Cuantificador = Heroe => Int
+  def valorStatPrincipal(heroe: Heroe): Double = heroe.statPrincipal
   case class Stats(
 		hp: Double,
 		fuerza: Double,
 		velocidad: Double,
 		inteligencia: Double
 	)
+  case class Equipo(
+    heroes: List[Heroe],
+    pozo: Int,
+    nombre: String
+   ){
+    def entregarItem(item: Item) = {
+
+      Try(heroes.map(heroe => heroe.equiparItem(item))).toOption match {
+        case Some(unosHeroes) => Try(unosHeroes.maxBy(h => h.incremento)).toOption match {
+        case Some(heroe) => this.copy(heroes.map(h => if(h==heroe) h.equiparItem(item) else h), pozo, nombre)
+        case otro => this.copy(heroes, pozo + item.valor, nombre)
+      }
+      case otro => this.copy(heroes, pozo + item.valor, nombre)
+    }
+      }
+    
+      
+    
+    
+    def esLiderDeTipo(tipo: Trabajo) = lider.trabajo == tipo
+    def cantidadDeLadrones() = heroes.count(heroe => heroe.trabajo == Ladron)
+    def mejorHeroeSegun(cuantificador: Cuantificador): Option[Heroe] =
+      Try(heroes.maxBy(heroe => cuantificador(heroe))).toOption
+      
+    
+    def lider() = heroes.maxBy(heroe => valorStatPrincipal(heroe))
+    def obtenerMiembro(heroe: Heroe) = this.copy(heroes ++ Some(heroe).toList, pozo, nombre)
+    def reemplazarMiembro(heroe: Heroe, reemplazo: Heroe) = this.copy(heroes.filter(unHeroe => unHeroe != reemplazo) ++ Some(heroe).toList, pozo, nombre)
+  }
+
+  // armo polimorfismo adhoc por la doble condicion de que puede segun eficacia
+  // y la accion de realizarla, me parece demasiada logica como para usar pattern
+  trait Tarea{
+    def realizarTarea(heroe: Heroe): Heroe = ???
+    def facilidad(heroe: Heroe, equipo: Equipo): Option[Double] = ???
+  }
+  case class pelearConMonstruo(danio: Int) extends Tarea{
+    override def realizarTarea(heroe: Heroe): Heroe = if (heroe.fuerza < 20) heroe.copy(heroe.stats.copy(heroe.hpBase - danio), heroe.trabajo, heroe.items) else heroe
+    override def facilidad(heroe: Heroe, equipo: Equipo): Option[Double] = if (equipo.esLiderDeTipo(Guerrero)) Some(20) else Some(10)
+  }
+  case class forzarPuerta() extends Tarea {
+     override def realizarTarea(heroe: Heroe) = heroe.trabajo match {
+       case Some(Mago) => heroe
+       case Some(Ladron) => heroe
+       case Some(_) => heroe.copy(heroe.stats.copy(heroe.hpBase - 5,heroe.fuerzaBase +1))
+       case otro => heroe
+     }
+  
+     override def facilidad(heroe: Heroe, equipo: Equipo): Option[Double] = Some(heroe.inteligencia + equipo.cantidadDeLadrones())
+  }
+    case class robarTalisman(talisman: Item) extends Tarea{
+      // validar que sea un talisman?
+    override def realizarTarea(heroe: Heroe) = heroe.copy(heroe.stats, heroe.trabajo, heroe.items ++ Some(talisman).toList)
+    override def facilidad(heroe: Heroe, equipo: Equipo): Option[Double] = if(equipo.esLiderDeTipo(Ladron)) Some(heroe.velocidad) else None  
+   }
+   trait ResultadoDeTarea{
+    def equipo: Equipo
+    def tarea: Option[Tarea] = None
+  }
+	case class ContinuaMision(equipo: Equipo) extends ResultadoDeTarea
+	case class NoPuedeSeguirEnLaMision(equipo: Equipo, tareaFallida: Tarea) extends ResultadoDeTarea
+	
+  type Recompensa = Equipo => Equipo
+  trait mision{
+    def tareas: List[Tarea]
+    def recompensar: Recompensa = ???
+    def ejecutar(equipo: Equipo) : ResultadoDeTarea = {
+      tareas.foldLeft(ContinuaMision(equipo): ResultadoDeTarea){ (equipoAnterior, tareaActual) => 
+        equipoAnterior match {
+          case ContinuaMision(equipo) => Try(equipo.heroes.maxBy(heroe => tareaActual.facilidad(heroe, equipo))).toOption match {
+            case Some(heroe) => ContinuaMision(equipo.copy(equipo.heroes.map(h => if(h==heroe) tareaActual.realizarTarea(heroe) else heroe), equipo.pozo, equipo.nombre))
+            case otro => NoPuedeSeguirEnLaMision(equipo, tareaActual)
+          }
+          case otro => otro
+        }
+      } match {
+        case ContinuaMision(equipo) => ContinuaMision(recompensar(equipo))
+        case otro => otro
+      }
+    }
+  }
 }
+
 
