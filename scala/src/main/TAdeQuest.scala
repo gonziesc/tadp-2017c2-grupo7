@@ -23,8 +23,8 @@ object tp {
           case cabeza: Cabeza => this.copy(stats, trabajo, inventario.copy(cabeza = Option(cabeza)))
           case armadura: Armadura => this.copy(stats, trabajo, inventario.copy(torso = Option(armadura)))
           case talisman: Talisman => this.copy(stats, trabajo, inventario.copy(talismanes = inventario.talismanes ++ List(talisman)))
-          case dosmanos: dosManos => this.copy(stats, trabajo, inventario.copy(manos = DosManos(Option(dosmanos))))
-          case unamano: unaMano => inventario.manos match {
+          case dosmanos: manos => this.copy(stats, trabajo, inventario.copy(manos = DosManos(Option(dosmanos))))
+          case unamano: mano => inventario.manos match {
             case DosManos(_) => this.copy(stats, trabajo, inventario.copy(manos = UnaMano(Option(unamano))))
             case UnaMano(unaMano, None) => this.copy(stats, trabajo, inventario.copy(manos = UnaMano(unaMano, Option(unamano))))
             case UnaMano(unaMano, otraMano) => this.copy(stats, trabajo, inventario.copy(manos = UnaMano(Option(unamano),otraMano)))
@@ -133,10 +133,10 @@ object tp {
   trait InventarioManos {
     def items():List[Item] = ???
   }
-  case class UnaMano(manoIzquierda: Option[unaMano], manoDerecha: Option[unaMano] = None) extends InventarioManos{
+  case class UnaMano(manoIzquierda: Option[mano], manoDerecha: Option[mano] = None) extends InventarioManos{
     override def items() = manoIzquierda.toList ++ manoDerecha.toList
   }
-  case class DosManos(dosManos: Option[dosManos]) extends InventarioManos
+  case class DosManos(dosManos: Option[manos]) extends InventarioManos
 	
   case class Inventario(
       manos: InventarioManos,
@@ -156,8 +156,8 @@ object tp {
    
   
 	case class Cabeza() extends Item
-  case class unaMano() extends Item
-  case class dosManos() extends Item
+  case class mano() extends Item
+  case class manos() extends Item
   case class Armadura() extends Item
   case class Talisman() extends Item
   case class Espalda() extends Item
@@ -176,7 +176,7 @@ object tp {
 		              velocidad = heroe.stats.velocidad + 10)))
   }
   
-  object palitoMagico extends unaMano(){
+  object palitoMagico extends mano(){
     override def puedeEquipar(heroe: Heroe) = 
       heroe.trabajo == Some(Mago) || heroe.trabajo == Some(Ladron) && heroe.inteligenciaBase > 30
         override def efecto(heroe: Heroe) = Seguir(heroe.copy(stats = heroe.stats.copy(inteligencia = heroe.stats.inteligencia + 20)))
@@ -187,7 +187,7 @@ object tp {
         override def efecto(heroe: Heroe) = Seguir(heroe.copy(stats = heroe.stats.copy(hp = heroe.stats.hp - 30,velocidad = heroe.stats.velocidad + 30)))
   }
   
-  object arcoViejo extends dosManos(){
+  object arcoViejo extends manos(){
     override def puedeEquipar(heroe: Heroe) = true
     override def efecto(heroe: Heroe) = Seguir(heroe.copy(stats = heroe.stats.copy(fuerza = heroe.stats.fuerza + 2)))
   }
@@ -216,7 +216,7 @@ object tp {
      override def efecto(heroe: Heroe) = Seguir(heroe.copy(stats = heroe.stats.copy(fuerza = heroe.stats.hp)))
   }
   
-  object escudoAntiRobo extends dosManos(){
+  object escudoAntiRobo extends manos(){
     override def puedeEquipar(heroe: Heroe) = 
       heroe.trabajo != Some(Ladron) && heroe.fuerzaBase > 20
         override def efecto(heroe: Heroe) = Seguir(heroe.copy(stats = heroe.stats.copy(hp = heroe.stats.hp + 20)))
@@ -308,7 +308,7 @@ object tp {
 
   
  type Recompensa = Equipo => Equipo
-  trait mision{
+  trait Mision{
     def tareas: List[Tarea]
     def recompensar: Recompensa = ???
     def ejecutar(equipo: Equipo) : ResultadoDeTarea = {
@@ -332,7 +332,41 @@ object tp {
       }
     }
   }
+ type Criterio = (Equipo, Equipo) => Boolean
+ trait criterios {
+  def elegirMision(equipo: Equipo, mision1: Mision, mision2: Mision, criterio: Criterio): Option[Mision] = {
+  val equipoMision1 = mision1.ejecutar(equipo)
+  val equipoMision2 = mision2.ejecutar(equipo)
+  equipoMision1 match {
+    case ContinuaMision(e1) => {
+      equipoMision2 match {
+        case ContinuaMision(e2) if((criterio(e1, e2))) => Some(mision1)
+        case ContinuaMision(e2) => Some(mision2)
+        case otro => Some(mision1)
+      }
+    }
+    case otro => equipoMision2 match {
+      case ContinuaMision(e2) => Some(mision2)
+      case otro => None
+    }
+  }
+  }
+ }
+ 
+ def entrenar(equipo: Equipo, misiones: List[Mision]):ResultadoDeTarea = {
+    misiones.foldLeft(ContinuaMision(equipo): ResultadoDeTarea){
+        (equipoAnterior, misionActual) => 
+         equipoAnterior match {
+            case ContinuaMision(e) => misionActual.ejecutar(e)
+            case otro => otro
+          }
+          }
+ }
+  
 }
+
+
+
 
 
 
