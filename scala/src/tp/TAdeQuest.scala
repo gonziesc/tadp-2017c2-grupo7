@@ -322,7 +322,7 @@ object TAdeQuest {
                 .maxBy(heroe => tareaActual.facilidad(heroe, equipoAnterior))).toOption match {
                 case Some(heroe) => ContinuaMision(equipoAnterior.copy(equipoAnterior.heroes.map(h => if (h == heroe) tareaActual.realizarTarea(heroe) else heroe), equipoAnterior.pozo, equipoAnterior.nombre))
                 case otro => NoPuedeSeguirEnLaMision(equipoAnterior, tareaActual)
-              } //ARREGLAR: Una vez que termina con las tareas, vuelve a arrancar, haciendo las tareas mas de una vez. CREO QUE ANDA
+              }
             case otro => otro
           }
       } match {
