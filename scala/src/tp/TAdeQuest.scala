@@ -139,7 +139,9 @@ object TAdeQuest {
   case class UnaMano(manoIzquierda: Option[mano], manoDerecha: Option[mano] = None) extends InventarioManos {
     override def items() = manoIzquierda.toList ++ manoDerecha.toList
   }
-  case class DosManos(dosManos: Option[manos]) extends InventarioManos
+  case class DosManos(dosManos: Option[manos]) extends InventarioManos {
+    override def items() = dosManos.toList
+  }
 
   case class Inventario(
     manos: InventarioManos,
