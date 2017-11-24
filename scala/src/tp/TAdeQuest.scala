@@ -259,6 +259,10 @@ object TAdeQuest {
     def estaEnEquipo(heroe: Heroe): Boolean = heroes.contains(heroe)
     def reemplazarMiembro(heroe: Heroe, reemplazo: Heroe) =
       this.copy(heroes.filter(unHeroe => unHeroe != heroe) :+ reemplazo, pozo, nombre)
+    def puedeRealizarTarea(tarea: Tarea) : Option[Heroe] = 
+      return heroes.sortBy(heroe => tarea.facilidad(heroe, this)).headOption
+    
+    
   }
 
   //▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
@@ -302,36 +306,43 @@ object TAdeQuest {
   // MISION
   //▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 
-  trait ResultadoDeTarea {
-    def equipo: Equipo
-    def tarea: Option[Tarea] = None
+  object Result {
+    def apply(equipo: => Equipo): Result = try {
+      ContinuaMision(equipo)
+    } catch {
+      case tarea: Tarea => NoPuedeSeguirEnLaMision(equipo, tarea)
+    }
   }
-  case class ContinuaMision(equipo: Equipo) extends ResultadoDeTarea
+  sealed trait Result {
+    def equipo: Equipo
+    def map(f: Equipo => Equipo): Result
+    def flatMap(f: Equipo => Result): Result
+  }
+
+  case class ContinuaMision(equipo: Equipo) extends Result {
+    def map(f: Equipo => Equipo) = Result(f(equipo))
+    def flatMap(f: Equipo => Result) = f(equipo)
+  }
   case class NoPuedeSeguirEnLaMision(
     equipo: Equipo,
-    tareaFallida: Tarea) extends ResultadoDeTarea
+    tareaFallida: Tarea) extends Result {
+    def map(f: Equipo => Equipo) = this
+    def flatMap(f: Equipo => Result) = this
+  }
 
   type Recompensa = Equipo => Equipo
   trait Mision {
     def tareas: List[Tarea]
     def recompensar: Recompensa = ???
-    def ejecutar(equipo: Equipo): ResultadoDeTarea = {
-      tareas.foldLeft(ContinuaMision(equipo): ResultadoDeTarea) {
+    def ejecutar(equipo: Equipo): Result = 
+     tareas.foldLeft(ContinuaMision(equipo): Result) {
         (equipoAnterior, tareaActual) =>
-          equipoAnterior match {
-            case ContinuaMision(equipoAnterior) =>
-              Try(equipoAnterior.heroes.filter(heroe => tareaActual.facilidad(heroe, equipoAnterior) != None)
-                .maxBy(heroe => tareaActual.facilidad(heroe, equipoAnterior))).toOption match {
-                case Some(heroe) => ContinuaMision(equipoAnterior.copy(equipoAnterior.heroes.map(h => if (h == heroe) tareaActual.realizarTarea(heroe) else heroe), equipoAnterior.pozo, equipoAnterior.nombre))
-                case otro => NoPuedeSeguirEnLaMision(equipoAnterior, tareaActual)
+             equipoAnterior.equipo.puedeRealizarTarea(tareaActual) match {
+                case Some(heroe) => equipoAnterior.map (equipo => equipo.copy(equipo.heroes.map(h => if (h == heroe) tareaActual.realizarTarea(heroe) else heroe), equipo.pozo, equipo.nombre))
+                case otro => NoPuedeSeguirEnLaMision(equipoAnterior.equipo, tareaActual)
               }
-            case otro => otro
-          }
-      } match {
-        case ContinuaMision(equipo) => ContinuaMision(recompensar(equipo))
-        case otro => otro
-      }
     }
+    
   }
   type Criterio = (Equipo, Equipo) => Boolean
   trait criterios {
@@ -354,15 +365,11 @@ object TAdeQuest {
     }
   }
 
-  def entrenar(equipo: Equipo, misiones: List[Mision]): ResultadoDeTarea = {
-    misiones.foldLeft(ContinuaMision(equipo): ResultadoDeTarea) {
+  def entrenar(equipo: Equipo, misiones: List[Mision]): Result = 
+    misiones.foldLeft(ContinuaMision(equipo): Result) {
       (equipoAnterior, misionActual) =>
-        equipoAnterior match {
-          case ContinuaMision(e) => misionActual.ejecutar(e)
-          case otro => otro
-        }
+         equipoAnterior.flatMap(equipo => misionActual.ejecutar(equipo))
     }
-  }
 
 }
 
